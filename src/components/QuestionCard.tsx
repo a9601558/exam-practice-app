@@ -6,37 +6,89 @@ import QuestionOption from './QuestionOption';
 interface QuestionCardProps {
   question: Question;
   onNext: () => void;
+  onAnswerSubmitted?: (isCorrect: boolean, selectedOption: string | string[]) => void;
   questionNumber: number;
   totalQuestions: number;
   quizTitle: string;
 }
 
-const QuestionCard = ({ question, onNext, questionNumber, totalQuestions, quizTitle }: QuestionCardProps) => {
+const QuestionCard = ({ 
+  question, 
+  onNext, 
+  onAnswerSubmitted, 
+  questionNumber, 
+  totalQuestions, 
+  quizTitle 
+}: QuestionCardProps) => {
+  // 单选题选择一个选项，多选题选择多个选项
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [showExplanation, setShowExplanation] = useState(false);
   const navigate = useNavigate();
 
   const handleOptionClick = (optionId: string) => {
-    if (!isSubmitted) {
+    if (isSubmitted) return;
+
+    if (question.questionType === 'single') {
+      // 单选题
       setSelectedOption(optionId);
+    } else {
+      // 多选题
+      setSelectedOptions(prev => {
+        if (prev.includes(optionId)) {
+          // 如果已选中，则移除
+          return prev.filter(id => id !== optionId);
+        } else {
+          // 如果未选中，则添加
+          return [...prev, optionId];
+        }
+      });
     }
   };
 
   const handleSubmit = () => {
-    if (selectedOption) {
+    if (question.questionType === 'single' && selectedOption) {
       setIsSubmitted(true);
+      // 通知父组件答题结果
+      const isCorrect = selectedOption === question.correctAnswer;
+      if (onAnswerSubmitted) {
+        onAnswerSubmitted(isCorrect, selectedOption);
+      }
+    } else if (question.questionType === 'multiple' && selectedOptions.length > 0) {
+      setIsSubmitted(true);
+      // 比较选中的选项和正确答案（数组比较）
+      const correctAnswers = question.correctAnswer as string[];
+      // 判断所选选项是否与正确答案完全一致
+      const isCorrect = 
+        selectedOptions.length === correctAnswers.length && 
+        selectedOptions.every(option => correctAnswers.includes(option)) &&
+        correctAnswers.every(option => selectedOptions.includes(option));
+      
+      if (onAnswerSubmitted) {
+        onAnswerSubmitted(isCorrect, selectedOptions);
+      }
     }
   };
 
   const handleNext = () => {
     setSelectedOption(null);
+    setSelectedOptions([]);
     setIsSubmitted(false);
     setShowExplanation(false);
     onNext();
   };
 
-  const isCorrect = selectedOption === question.correctAnswer;
+  // 判断答案是否正确
+  const isCorrect = 
+    question.questionType === 'single' 
+      ? selectedOption === question.correctAnswer
+      : isSubmitted && (() => {
+          const correctAnswers = question.correctAnswer as string[];
+          return selectedOptions.length === correctAnswers.length && 
+                 selectedOptions.every(option => correctAnswers.includes(option)) &&
+                 correctAnswers.every(option => selectedOptions.includes(option));
+        })();
 
   return (
     <div className="bg-white shadow-md rounded-lg p-6 max-w-3xl mx-auto">
@@ -61,6 +113,9 @@ const QuestionCard = ({ question, onNext, questionNumber, totalQuestions, quizTi
       {/* 问题标题和进度 */}
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold text-gray-800">问题 {questionNumber} / {totalQuestions}</h2>
+        <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm">
+          {question.questionType === 'single' ? '单选题' : '多选题'}
+        </span>
       </div>
 
       {/* 问题内容 */}
@@ -74,9 +129,20 @@ const QuestionCard = ({ question, onNext, questionNumber, totalQuestions, quizTi
           <QuestionOption
             key={option.id}
             option={option}
-            isSelected={selectedOption === option.id}
-            isCorrect={isSubmitted ? question.correctAnswer : null}
+            isSelected={
+              question.questionType === 'single' 
+                ? selectedOption === option.id 
+                : selectedOptions.includes(option.id)
+            }
+            isCorrect={
+              isSubmitted
+                ? question.questionType === 'single'
+                  ? question.correctAnswer as string
+                  : (question.correctAnswer as string[]).includes(option.id) ? option.id : null
+                : null
+            }
             isSubmitted={isSubmitted}
+            isMultiple={question.questionType === 'multiple'}
             onClick={() => handleOptionClick(option.id)}
           />
         ))}
@@ -89,7 +155,13 @@ const QuestionCard = ({ question, onNext, questionNumber, totalQuestions, quizTi
             <div className="flex items-center">
               <span className={`inline-block w-5 h-5 rounded-full mr-2 ${isCorrect ? 'bg-green-500' : 'bg-red-500'}`}></span>
               <span className={`font-medium ${isCorrect ? 'text-green-600' : 'text-red-600'}`}>
-                {isCorrect ? '回答正确!' : `回答错误! 正确答案是 ${question.correctAnswer}`}
+                {isCorrect ? '回答正确!' : '回答错误!'}
+                {!isCorrect && question.questionType === 'single' && 
+                  ` 正确答案是 ${question.correctAnswer}`
+                }
+                {!isCorrect && question.questionType === 'multiple' && 
+                  ` 正确答案是 ${(question.correctAnswer as string[]).join(', ')}`
+                }
               </span>
             </div>
             <button
@@ -114,9 +186,11 @@ const QuestionCard = ({ question, onNext, questionNumber, totalQuestions, quizTi
         {!isSubmitted ? (
           <button
             onClick={handleSubmit}
-            disabled={!selectedOption}
+            disabled={question.questionType === 'single' 
+              ? !selectedOption 
+              : selectedOptions.length === 0}
             className={`py-2 px-6 rounded-lg font-medium ${
-              selectedOption
+              (question.questionType === 'single' ? selectedOption : selectedOptions.length > 0)
                 ? 'bg-blue-600 text-white hover:bg-blue-700'
                 : 'bg-gray-300 text-gray-500 cursor-not-allowed'
             }`}

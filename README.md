@@ -1,54 +1,121 @@
-# React + TypeScript + Vite
+# 考试练习应用
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+这是一个用于练习考试题目的Web应用，支持多种题型、付费题库和兑换码系统。
 
-Currently, two official plugins are available:
+## 功能特点
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 用户系统
+- 用户注册和登录
+- 个人资料管理
+- 普通用户和管理员角色
 
-## Expanding the ESLint configuration
+### 题库系统
+- 多种分类的题库
+- 单选题和多选题支持
+- 题目随机顺序
+- 答题记录和进度保存
+- 正确率统计
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+### 付费系统
+- 免费题库和付费题库
+- 付费题库支持试用部分题目
+- Stripe集成进行支付处理
+- 购买记录管理
+- 有效期为6个月的访问权限
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+### 兑换码系统
+- 管理员可生成兑换码
+- 支持自定义有效期的兑换码
+- 兑换码可用于获取付费题库访问权限
+- 兑换记录管理
+
+### 管理功能
+- 用户管理：查看、添加、编辑、删除用户
+- 题库管理：创建、编辑、删除题库
+- 首页内容管理：编辑网站显示内容
+- 兑换码管理：生成和跟踪兑换码使用情况
+
+## 用户指南
+
+### 作为普通用户
+
+1. **浏览题库**
+   - 在首页可以查看所有可用题库
+   - 免费题库可直接访问
+   - 付费题库显示价格和试用题目数量
+
+2. **答题功能**
+   - 选择题库开始答题
+   - 查看答题进度和正确率
+   - 复习错题和已答题目
+
+3. **付费内容访问**
+   - 在付费题库中，可以免费试用部分题目
+   - 通过支付购买完整题库（有效期6个月）
+   - 使用兑换码获取题库访问权限
+
+4. **个人中心**
+   - 查看学习进度
+   - 管理购买记录
+   - 查看兑换码使用记录
+   - 账户设置（开发中）
+
+### 作为管理员
+
+1. **用户管理**
+   - 查看所有用户
+   - 添加、编辑、删除用户
+
+2. **题库管理**
+   - 创建新题库和题目
+   - 设置免费/付费状态
+   - 编辑现有题库
+
+3. **兑换码管理**
+   - 为特定题库生成兑换码
+   - 设置兑换码有效期
+   - 批量生成兑换码
+   - 跟踪兑换码使用情况
+
+4. **内容管理**
+   - 编辑首页内容
+   - 管理网站设置
+
+## 技术栈
+
+- 前端：React、TypeScript、Tailwind CSS
+- 状态管理：React Context API
+- 路由：React Router
+- 支付处理：Stripe
+- 样式：Tailwind CSS
+
+## 开发与运行
+
+1. 安装依赖:
+```
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+2. 启动开发服务器:
 ```
+npm run dev
+```
+
+3. 构建生产版本:
+```
+npm run build
+```
+
+## 兑换码和支付流程
+
+### 兑换码流程
+1. 管理员在管理后台为特定题库生成兑换码
+2. 用户在题库页面点击"使用兑换码"
+3. 输入有效兑换码后，获取该题库的完整访问权限
+4. 系统记录兑换情况和有效期
+
+### 支付流程
+1. 用户在题库页面点击"购买完整题库"
+2. 弹出支付窗口，用户输入支付信息
+3. 支付成功后，用户获得该题库6个月的访问权限
+4. 系统记录购买记录和到期时间

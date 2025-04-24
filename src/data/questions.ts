@@ -3,11 +3,14 @@ export interface Option {
   text: string;
 }
 
+export type QuestionType = 'single' | 'multiple';
+
 export interface Question {
   id: number;
   question: string;
   options: Option[];
-  correctAnswer: string;
+  questionType: QuestionType;
+  correctAnswer: string | string[]; // 单选题为字符串，多选题为字符串数组
   explanation: string;
 }
 
@@ -15,6 +18,7 @@ export const questions: Question[] = [
   {
     id: 1,
     question: "在 TCP/IP 协议栈中，哪一层负责路由选择和数据转发？",
+    questionType: 'single',
     options: [
       { id: "A", text: "物理层" },
       { id: "B", text: "数据链路层" },
@@ -27,6 +31,7 @@ export const questions: Question[] = [
   {
     id: 2,
     question: "以下哪种排序算法的平均时间复杂度为 O(n log n)？",
+    questionType: 'single',
     options: [
       { id: "A", text: "冒泡排序" },
       { id: "B", text: "插入排序" },
@@ -39,6 +44,7 @@ export const questions: Question[] = [
   {
     id: 3,
     question: "在面向对象编程中，下列关于封装的说法哪一项是正确的？",
+    questionType: 'single',
     options: [
       { id: "A", text: "封装是将数据和行为绑定在一起，对外部隐藏实现细节" },
       { id: "B", text: "封装主要用于实现多态性" },
