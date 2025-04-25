@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Question } from '../data/questions';
 import QuestionOption from './QuestionOption';
@@ -10,6 +10,11 @@ interface QuestionCardProps {
   questionNumber: number;
   totalQuestions: number;
   quizTitle: string;
+  userAnsweredQuestion?: { 
+    index: number; 
+    isCorrect: boolean; 
+    selectedOption: string | string[];
+  };
 }
 
 const QuestionCard = ({ 
@@ -18,12 +23,13 @@ const QuestionCard = ({
   onAnswerSubmitted, 
   questionNumber, 
   totalQuestions, 
-  quizTitle 
+  quizTitle,
+  userAnsweredQuestion 
 }: QuestionCardProps) => {
   // 单选题选择一个选项，多选题选择多个选项
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [selectedOptions, setSelectedOptions] = useState<string[]>([]);
-  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(!!userAnsweredQuestion);
   const [showExplanation, setShowExplanation] = useState(false);
   const navigate = useNavigate();
 

@@ -1,12 +1,31 @@
 import React, { useState } from 'react';
-import { useQuiz, QuizSet } from '../../contexts/QuizContext';
+import { questionSets, QuestionSet } from '../../data/questionSets';
 
 const AdminQuizManagement: React.FC = () => {
-  const { quizSets, deleteQuizSet, addQuizSet, updateQuizSet } = useQuiz();
+  // 假设的数据管理函数，实际实现应连接到后端API
+  const [managedQuizSets, setManagedQuizSets] = useState<QuestionSet[]>([...questionSets]);
+  
+  const deleteQuizSet = (id: string) => {
+    setManagedQuizSets(prevSets => prevSets.filter(set => set.id !== id));
+    return true;
+  };
+  
+  const addQuizSet = (newSet: QuestionSet) => {
+    setManagedQuizSets(prevSets => [...prevSets, newSet]);
+    return true;
+  };
+  
+  const updateQuizSet = (updatedSet: QuestionSet) => {
+    setManagedQuizSets(prevSets => 
+      prevSets.map(set => set.id === updatedSet.id ? updatedSet : set)
+    );
+    return true;
+  };
+
   const [showConfirmDelete, setShowConfirmDelete] = useState<string | null>(null);
-  const [editingQuizSet, setEditingQuizSet] = useState<QuizSet | null>(null);
-  const [newQuizSet, setNewQuizSet] = useState<Partial<QuizSet>>({
-    name: '',
+  const [editingQuizSet, setEditingQuizSet] = useState<QuestionSet | null>(null);
+  const [newQuizSet, setNewQuizSet] = useState<Partial<QuestionSet>>({
+    title: '',
     description: '',
     category: '',
     questions: []
@@ -23,7 +42,7 @@ const AdminQuizManagement: React.FC = () => {
   };
   
   // 处理编辑题库
-  const handleEditQuizSet = (quizSet: QuizSet) => {
+  const handleEditQuizSet = (quizSet: QuestionSet) => {
     setEditingQuizSet({...quizSet});
   };
   
@@ -40,23 +59,24 @@ const AdminQuizManagement: React.FC = () => {
   
   // 处理新建题库
   const handleCreateQuizSet = () => {
-    if (!newQuizSet.name || !newQuizSet.description || !newQuizSet.category) {
+    if (!newQuizSet.title || !newQuizSet.description || !newQuizSet.category) {
       alert('请填写完整信息');
       return;
     }
     
-    const quizSetToAdd: QuizSet = {
+    const quizSetToAdd: QuestionSet = {
       id: `quiz-${Date.now()}`,
-      name: newQuizSet.name,
-      description: newQuizSet.description,
-      category: newQuizSet.category,
+      title: newQuizSet.title || '',
+      description: newQuizSet.description || '',
+      category: newQuizSet.category || '',
+      icon: '📚',
+      isPaid: false,
       questions: [],
-      createdAt: new Date().toISOString()
     };
     
     if (addQuizSet(quizSetToAdd)) {
       setNewQuizSet({
-        name: '',
+        title: '',
         description: '',
         category: '',
         questions: []
@@ -72,7 +92,7 @@ const AdminQuizManagement: React.FC = () => {
     setEditingQuizSet(null);
     setShowNewQuizForm(false);
   };
-  
+
   return (
     <div className="px-4 py-5 sm:p-6">
       <div className="flex justify-between items-center mb-4">
@@ -95,8 +115,8 @@ const AdminQuizManagement: React.FC = () => {
                 type="text"
                 id="name"
                 className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                value={newQuizSet.name}
-                onChange={(e) => setNewQuizSet({...newQuizSet, name: e.target.value})}
+                value={newQuizSet.title}
+                onChange={(e) => setNewQuizSet({...newQuizSet, title: e.target.value})}
               />
             </div>
             
@@ -152,8 +172,8 @@ const AdminQuizManagement: React.FC = () => {
                 type="text"
                 id="edit-name"
                 className="mt-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md"
-                value={editingQuizSet.name}
-                onChange={(e) => setEditingQuizSet({...editingQuizSet, name: e.target.value})}
+                value={editingQuizSet.title}
+                onChange={(e) => setEditingQuizSet({...editingQuizSet, title: e.target.value})}
               />
             </div>
             
@@ -213,7 +233,7 @@ const AdminQuizManagement: React.FC = () => {
                 题目数量
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                创建时间
+                付费状态
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 操作
@@ -221,10 +241,10 @@ const AdminQuizManagement: React.FC = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {quizSets.map((quizSet) => (
+            {managedQuizSets.map((quizSet) => (
               <tr key={quizSet.id}>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-gray-900">{quizSet.name}</div>
+                  <div className="text-sm font-medium text-gray-900">{quizSet.title}</div>
                   <div className="text-sm text-gray-500">{quizSet.description}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -234,7 +254,7 @@ const AdminQuizManagement: React.FC = () => {
                   {quizSet.questions.length}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {new Date(quizSet.createdAt).toLocaleDateString('zh-CN')}
+                  {quizSet.isPaid ? `付费 (¥${quizSet.price})` : '免费'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex space-x-2">
@@ -273,7 +293,7 @@ const AdminQuizManagement: React.FC = () => {
               </tr>
             ))}
             
-            {quizSets.length === 0 && (
+            {managedQuizSets.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
                   没有题库数据
@@ -286,5 +306,7 @@ const AdminQuizManagement: React.FC = () => {
     </div>
   );
 };
+
+export default AdminQuizManagement;
 
  

@@ -13,6 +13,7 @@ const AdminRedeemCodes: React.FC = () => {
   const [statusMessage, setStatusMessage] = useState<{ type: string; message: string }>({ type: '', message: '' });
   const [filterStatus, setFilterStatus] = useState<'all' | 'used' | 'unused'>('all');
   const [filterQuestionSet, setFilterQuestionSet] = useState<string>('all');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Get paid question sets
   useEffect(() => {
@@ -22,7 +23,23 @@ const AdminRedeemCodes: React.FC = () => {
 
   // Get redeem codes
   useEffect(() => {
-    setRedeemCodes(getRedeemCodes());
+    const fetchRedeemCodes = async () => {
+      try {
+        setIsLoading(true);
+        const codes = await getRedeemCodes();
+        setRedeemCodes(codes);
+      } catch (error) {
+        console.error('获取兑换码失败:', error);
+        setStatusMessage({
+          type: 'error',
+          message: '获取兑换码失败，请刷新页面重试'
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRedeemCodes();
   }, [getRedeemCodes]);
 
   // Filter redeem codes based on status and question set
@@ -34,7 +51,7 @@ const AdminRedeemCodes: React.FC = () => {
   });
 
   // Handle generating redeem codes
-  const handleGenerateCode = () => {
+  const handleGenerateCode = async () => {
     if (!selectedQuestionSet) {
       setStatusMessage({ 
         type: 'error', 
@@ -60,17 +77,25 @@ const AdminRedeemCodes: React.FC = () => {
     }
 
     try {
-      const newCodes = generateRedeemCode(selectedQuestionSet, validityDays, quantity);
-      setRedeemCodes(getRedeemCodes());
+      setIsLoading(true);
+      await generateRedeemCode(selectedQuestionSet, validityDays, quantity);
+      
+      // 重新获取更新后的兑换码列表
+      const updatedCodes = await getRedeemCodes();
+      setRedeemCodes(updatedCodes);
+      
       setStatusMessage({ 
         type: 'success', 
         message: `成功生成 ${quantity} 个兑换码` 
       });
-    } catch (error) {
+    } catch (error: any) {
+      console.error('生成兑换码失败:', error);
       setStatusMessage({ 
         type: 'error', 
-        message: '生成兑换码失败，请重试' 
+        message: error.message || '生成兑换码失败，请重试' 
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -137,6 +162,7 @@ const AdminRedeemCodes: React.FC = () => {
               value={selectedQuestionSet}
               onChange={(e) => setSelectedQuestionSet(e.target.value)}
               className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isLoading}
             >
               <option value="">-- 请选择题库 --</option>
               {paidQuestionSets.map(set => (
@@ -157,6 +183,7 @@ const AdminRedeemCodes: React.FC = () => {
               min="1"
               max="365"
               className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isLoading}
             />
           </div>
           
@@ -172,15 +199,17 @@ const AdminRedeemCodes: React.FC = () => {
               min="1"
               max="100"
               className="w-full border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isLoading}
             />
           </div>
           
           <div className="flex items-end">
             <button
               onClick={handleGenerateCode}
-              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-400 disabled:cursor-not-allowed"
+              disabled={isLoading}
             >
-              生成兑换码
+              {isLoading ? '处理中...' : '生成兑换码'}
             </button>
           </div>
         </div>
@@ -196,6 +225,7 @@ const AdminRedeemCodes: React.FC = () => {
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as 'all' | 'used' | 'unused')}
               className="border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isLoading}
             >
               <option value="all">所有状态</option>
               <option value="used">已使用</option>
@@ -206,6 +236,7 @@ const AdminRedeemCodes: React.FC = () => {
               value={filterQuestionSet}
               onChange={(e) => setFilterQuestionSet(e.target.value)}
               className="border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+              disabled={isLoading}
             >
               <option value="all">所有题库</option>
               {paidQuestionSets.map(set => (
@@ -215,7 +246,12 @@ const AdminRedeemCodes: React.FC = () => {
           </div>
         </div>
         
-        {filteredCodes.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+            <p className="mt-2 text-gray-600">加载中...</p>
+          </div>
+        ) : filteredCodes.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             没有符合条件的兑换码
           </div>
@@ -291,6 +327,7 @@ const AdminRedeemCodes: React.FC = () => {
                         <button
                           onClick={() => copyToClipboard(code.code)}
                           className="text-indigo-600 hover:text-indigo-900"
+                          disabled={isLoading}
                         >
                           复制
                         </button>

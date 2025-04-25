@@ -9,8 +9,10 @@ interface PaymentModalProps {
   onSuccess?: () => void;
 }
 
-// Stripe公钥
-const STRIPE_PUBLIC_KEY = 'pk_test_51RHMVW4ec3wxfwe9vME773VFyquoIP1bVWbsCDZgrgerfzp8YMs0rLS4ZSleICEcIf9gmLIEftwXvPygbLp1LEkv00r5M3rCIV';
+// Stripe公钥 - 在生产环境应该使用环境变量
+// 理想情况下，应该使用import.meta.env.VITE_STRIPE_PUBLIC_KEY等环境变量
+const STRIPE_PUBLIC_KEY = import.meta.env.VITE_STRIPE_PUBLIC_KEY || 
+  'pk_test_51RHMVW4ec3wxfwe9vME773VFyquoIP1bVWbsCDZgrgerfzp8YMs0rLS4ZSleICEcIf9gmLIEftwXvPygbLp1LEkv00r5M3rCIV';
 
 const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, questionSet, onSuccess }) => {
   const { user, addPurchase } = useUser();
@@ -118,7 +120,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, questionSe
       };
       
       // 添加购买记录
-      const result = addPurchase(purchase);
+      addPurchase(purchase);
       
       // 总是显示成功消息
       setSuccessMessage(`支付成功！您现在可以访问《${questionSet.title}》题库的所有内容，有效期至 ${expiryDate.toLocaleDateString()}`);
@@ -129,7 +131,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose, questionSe
       }
     } catch (err) {
       setError('支付处理过程中发生错误，请重试');
-      console.error('支付错误:', err);
+      // 在生产环境中应使用适当的错误记录服务
+      // console.error('支付错误:', err);
     } finally {
       setIsProcessing(false);
     }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { questionSets } from '../data/questionSets';
 import UserMenu from './UserMenu';
@@ -6,28 +6,27 @@ import { useUser } from '../contexts/UserContext';
 import LoginModal from './LoginModal';
 
 const HomePage = () => {
+  const { user, isAdmin, getPurchaseExpiry } = useUser();
   // 获取所有的分类
   const categories = [...new Set(questionSets.map(set => set.category))];
-  // 获取用户登录状态
-  const { user, isAdmin, hasPurchased, getPurchaseExpiry } = useUser();
   // 控制登录弹窗
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   // 显示用户信息
   const [showUserInfo, setShowUserInfo] = useState(false);
 
   // 格式化到期日期为用户友好的格式
-  const formatExpiryDate = (dateString: string | null) => {
-    if (!dateString) return '';
+  const formatExpiryDate = (dateInput: Date | string | null) => {
+    if (!dateInput) return '';
     
-    const date = new Date(dateString);
+    const date = dateInput instanceof Date ? dateInput : new Date(dateInput);
     return date.toLocaleDateString();
   };
 
   // 计算剩余天数
-  const calculateRemainingDays = (dateString: string | null) => {
-    if (!dateString) return 0;
+  const calculateRemainingDays = (dateInput: Date | string | null) => {
+    if (!dateInput) return 0;
     
-    const expiryDate = new Date(dateString);
+    const expiryDate = dateInput instanceof Date ? dateInput : new Date(dateInput);
     const today = new Date();
     const diffTime = expiryDate.getTime() - today.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));

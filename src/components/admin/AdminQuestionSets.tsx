@@ -36,7 +36,16 @@ const AdminQuestionSets: React.FC = () => {
 
   // 加载所有兑换码
   useEffect(() => {
-    setRedeemCodes(getRedeemCodes());
+    const loadRedeemCodes = async () => {
+      try {
+        const codes = await getRedeemCodes();
+        setRedeemCodes(codes);
+      } catch (error) {
+        console.error("加载兑换码失败:", error);
+      }
+    };
+    
+    loadRedeemCodes();
   }, [getRedeemCodes]);
 
   // 搜索过滤题库
@@ -206,30 +215,32 @@ const AdminQuestionSets: React.FC = () => {
   // 可用的分类选项
   const categoryOptions = ['网络协议', '编程语言', '计算机基础', '数据库', '操作系统', '安全技术', '云计算', '人工智能'];
 
-  // 显示生成兑换码弹窗
+  // 重新添加弹窗显示函数，并在按钮点击处调用
   const handleShowGenerateCodeModal = (questionSet: QuestionSet) => {
     setSelectedQuizForCode(questionSet);
     setCodeDurationDays(30); // 默认30天
     setGeneratedCode(null);
     setShowRedeemCodeModal(true);
   };
-  
+
   // 生成兑换码
-  const handleGenerateCode = () => {
+  const handleGenerateCode = async () => {
     if (!selectedQuizForCode) return;
     
     try {
-      const newCode = generateRedeemCode(selectedQuizForCode.id, codeDurationDays);
-      if (Array.isArray(newCode)) {
-        // 处理返回数组的情况
-        setRedeemCodes([...redeemCodes, ...newCode]);
-        setGeneratedCode(newCode[0]); // 显示第一个生成的码
+      // 添加quantity参数，默认生成1个兑换码
+      const quantity = 1;
+      const result = await generateRedeemCode(selectedQuizForCode.id, codeDurationDays, quantity);
+      
+      if (result.success && result.codes && result.codes.length > 0) {
+        // 添加新生成的兑换码到列表中
+        setRedeemCodes(prevCodes => [...prevCodes, ...(result.codes || [])]);
+        // 显示第一个生成的码
+        setGeneratedCode(result.codes[0]);
+        showStatusMessage("success", `已成功生成兑换码: ${result.codes[0].code}`);
       } else {
-        // 处理返回单个对象的情况
-        setRedeemCodes([...redeemCodes, newCode]);
-        setGeneratedCode(newCode);
+        showStatusMessage("error", result.message || "生成兑换码失败");
       }
-      showStatusMessage("success", `已成功生成兑换码: ${Array.isArray(newCode) ? newCode[0].code : newCode.code}`);
     } catch (error) {
       if (error instanceof Error) {
         showStatusMessage("error", error.message);
@@ -731,6 +742,12 @@ const AdminQuestionSets: React.FC = () => {
                         onClick={() => handleEditClick(set)}
                       >
                         编辑
+                      </button>
+                      <button
+                        className="text-green-600 hover:text-green-900 mr-3"
+                        onClick={() => handleShowGenerateCodeModal(set)}
+                      >
+                        生成兑换码
                       </button>
                       <button
                         className="text-red-600 hover:text-red-900"

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { questionSets } from '../data/questionSets';
 import QuestionCard from './QuestionCard';
-import { useUser } from '../contexts/UserContext';
 import LoginModal from './LoginModal';
 import PaymentModal from './PaymentModal';
 import RedeemCodeForm from './RedeemCodeForm';
+import { useUser } from '../contexts/UserContext';
 
 const QuizPage = () => {
   const { quizId } = useParams<{ quizId: string }>();
@@ -13,7 +13,7 @@ const QuizPage = () => {
   const { user, addProgress, hasPurchased, getPurchaseExpiry } = useUser();
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [quizSet, setQuizSet] = useState(questionSets.find(set => set.id === quizId));
+  const quizSet = questionSets.find(set => set.id === quizId);
   const [isRandomMode, setIsRandomMode] = useState(false);
   const [questionsOrder, setQuestionsOrder] = useState<number[]>([]);
   const [answeredQuestions, setAnsweredQuestions] = useState<{
@@ -43,7 +43,7 @@ const QuizPage = () => {
   }, [quizSet, quizId, user]);
   
   // 检查用户是否有权限访问完整题库
-  const checkPaymentAccess = () => {
+  const checkPaymentAccess = async () => {
     if (!quizSet) return;
     
     // 免费题库直接可以访问
@@ -53,11 +53,28 @@ const QuizPage = () => {
     }
     
     // 检查用户是否购买过此题库
-    if (user && hasPurchased(quizSet.id)) {
-      setHasAccessToFullQuiz(true);
-      // 获取过期时间
-      const expiry = getPurchaseExpiry(quizSet.id);
-      setExpiryDate(expiry);
+    if (user) {
+      try {
+        const hasPurchasedResult = await hasPurchased(quizSet.id);
+        setHasAccessToFullQuiz(hasPurchasedResult);
+        
+        if (hasPurchasedResult) {
+          // 获取过期时间
+          const expiry = await getPurchaseExpiry(quizSet.id);
+          if (expiry) {
+            setExpiryDate(expiry.toISOString());
+          } else {
+            setExpiryDate(null);
+          }
+        } else {
+          setExpiryDate(null);
+        }
+      } catch (error) {
+        // 在生产环境中应使用适当的错误记录服务
+        // console.error("检查购买状态失败:", error);
+        setHasAccessToFullQuiz(false);
+        setExpiryDate(null);
+      }
     } else {
       setHasAccessToFullQuiz(false);
       setExpiryDate(null);
@@ -115,13 +132,32 @@ const QuizPage = () => {
   const currentActualQuestionIndex = questionsOrder[currentQuestionIndex] || 0;
 
   // 保存用户答题进度
-  const saveProgress = () => {
+  const saveProgress = async () => {
     if (!user || !quizSet || answeredQuestions.length === 0) return;
     
-    // 遍历所有已回答的问题，为每一个问题调用 addProgress
-    answeredQuestions.forEach(answer => {
-      addProgress(quizSet.id, answer.isCorrect);
-    });
+    // 创建QuizProgress对象
+    const progress = {
+      questionSetId: quizSet.id,
+      answeredQuestions: answeredQuestions.map(answer => ({
+        questionId: String(quizSet.questions[answer.index].id), // 确保questionId是字符串
+        selectedOptionId: typeof answer.selectedOption === 'string' 
+          ? answer.selectedOption 
+          : answer.selectedOption.join(','),
+        isCorrect: answer.isCorrect
+      })),
+      score: Math.round(
+        (answeredQuestions.filter(a => a.isCorrect).length / answeredQuestions.length) * 100
+      ),
+      lastAttemptDate: new Date()
+    };
+    
+    // 调用addProgress保存进度
+    try {
+      await addProgress(progress);
+    } catch (error) {
+      // 在生产环境中应使用适当的错误记录服务
+      // console.error("保存进度失败:", error);
+    }
   };
 
   const handleNextQuestion = () => {
@@ -213,12 +249,27 @@ const QuizPage = () => {
   };
 
   // 处理购买完成
-  const handlePurchaseSuccess = () => {
+  const handlePurchaseSuccess = async () => {
     setShowPaymentModal(false);
     setHasAccessToFullQuiz(true);
-    // 获取过期时间
-    const expiry = getPurchaseExpiry(quizSet.id);
-    setExpiryDate(expiry);
+    
+    // 重新检查购买状态获取更新的过期时间
+    try {
+      const hasPurchasedResult = await hasPurchased(quizSet.id);
+      if (hasPurchasedResult) {
+        // 获取过期时间
+        const expiry = await getPurchaseExpiry(quizSet.id);
+        if (expiry) {
+          setExpiryDate(expiry.toISOString());
+        } else {
+          setExpiryDate(null);
+        }
+      }
+    } catch (error) {
+      // 在生产环境中应使用适当的错误记录服务
+      // console.error("获取购买信息失败:", error);
+    }
+    
     // 显示支付成功提示
     setPaymentSuccess(true);
     // 3秒后关闭提示
@@ -248,10 +299,10 @@ const QuizPage = () => {
   };
 
   // 处理兑换成功
-  const handleRedeemSuccess = (redeemedQuizId: string) => {
+  const handleRedeemSuccess = async (redeemedQuizId: string) => {
     if (redeemedQuizId === quizSet?.id) {
       // 兑换码兑换成功，重新检查权限
-      checkPaymentAccess();
+      await checkPaymentAccess();
       // 显示成功消息
       setRedeemSuccess(true);
       setShowRedeemForm(false);
@@ -381,301 +432,244 @@ const QuizPage = () => {
           </div>
         )}
 
-        {/* 未登录用户提示 */}
-        {!user && answeredQuestions.length > 0 && (
-          <div className="bg-yellow-50 border-l-4 border-yellow-500 p-4 mb-4">
+        {/* 模式切换和答题情况按钮 */}
+        <div className="bg-white shadow rounded-lg p-4 mb-6">
+          <div className="flex flex-wrap items-center justify-between">
+            <div className="flex items-center mb-3 sm:mb-0">
+              <span className="text-gray-600 mr-3">模式:</span>
+              <button 
+                onClick={toggleMode}
+                className={`px-3 py-1 rounded-md mr-2 ${!isRandomMode 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                顺序
+              </button>
+              <button 
+                onClick={toggleMode}
+                className={`px-3 py-1 rounded-md ${isRandomMode 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                随机
+              </button>
+            </div>
+            
+            <div className="flex items-center">
+              <button 
+                onClick={toggleShowAnswered}
+                className={`px-3 py-1 rounded-md mr-2 ${showAnsweredQuestions 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                {showAnsweredQuestions ? '返回答题' : '查看答题情况'}
+              </button>
+              
+              {answeredQuestions.length > 0 && (
+                <span className="text-sm text-gray-600">
+                  已答: {answeredQuestions.length}/{totalQuestions} | 错题: {wrongAnswersCount}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* 显示已答题目列表 */}
+        {showAnsweredQuestions && (
+          <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium text-gray-900">答题记录</h3>
+                
+                {answeredQuestions.length > 0 && wrongAnswersCount > 0 && (
+                  <button 
+                    onClick={toggleShowOnlyWrong}
+                    className={`px-3 py-1 text-sm rounded-md ${onlyShowWrongAnswers 
+                      ? 'bg-red-600 text-white' 
+                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+                  >
+                    {onlyShowWrongAnswers ? '显示全部题目' : '只看错题'}
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {filteredAnsweredQuestions.length > 0 ? (
+              <div className="divide-y divide-gray-200">
+                {filteredAnsweredQuestions.map((answer, idx) => {
+                  const question = quizSet.questions[answer.index];
+                  return (
+                    <div key={idx} className="p-4 hover:bg-gray-50">
+                      <div className="flex items-start">
+                        <div 
+                          className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center mr-3 ${
+                            answer.isCorrect ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+                          }`}
+                        >
+                          {answer.isCorrect ? (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <button 
+                            onClick={() => jumpToQuestion(answer.index)}
+                            className="text-left w-full"
+                          >
+                            <p className="font-medium text-gray-800">
+                              题目 {answer.index + 1}: {question.question}
+                            </p>
+                            <p className="mt-1 text-sm text-gray-600">
+                              {answer.isCorrect ? '正确答案' : '你的答案'}: {typeof answer.selectedOption === 'string' 
+                                ? question.options.find(opt => opt.id === answer.selectedOption)?.text || answer.selectedOption
+                                : answer.selectedOption.map(id => question.options.find(opt => opt.id === id)?.text || id).join(', ')
+                              }
+                            </p>
+                            {!answer.isCorrect && (
+                              <p className="mt-1 text-sm text-green-600">
+                                正确答案: {Array.isArray(question.correctAnswer)
+                                  ? question.correctAnswer.map(id => question.options.find(opt => opt.id === id)?.text || id).join(', ')
+                                  : question.options.find(opt => opt.id === question.correctAnswer)?.text || question.correctAnswer
+                                }
+                              </p>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-4 text-center text-gray-500">
+                {onlyShowWrongAnswers ? '没有错题记录' : '暂无答题记录'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 问题卡片 */}
+        {!showAnsweredQuestions && (
+          <>
+            <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+              <div className="p-4 sm:p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-sm font-medium text-gray-500">
+                    题目 {currentQuestionIndex + 1} / {totalQuestions}
+                  </span>
+                  
+                  <span className="text-sm font-medium text-gray-500">
+                    {quizSet.title}
+                  </span>
+                </div>
+                
+                <QuestionCard
+                  question={quizSet.questions[currentActualQuestionIndex]}
+                  onAnswerSubmitted={(isCorrect, selectedOption) => 
+                    handleAnswerSubmitted(currentActualQuestionIndex, isCorrect, selectedOption)
+                  }
+                  onNext={handleNextQuestion}
+                  questionNumber={currentQuestionIndex + 1}
+                  totalQuestions={totalQuestions}
+                  quizTitle={quizSet.title}
+                  userAnsweredQuestion={answeredQuestions.find(q => q.index === currentActualQuestionIndex)}
+                />
+              </div>
+            </div>
+            
+            {/* 题目导航 */}
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="p-4 border-b">
+                <h3 className="text-lg font-medium text-gray-900">题目导航</h3>
+              </div>
+              
+              <div className="p-4 grid grid-cols-5 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                {questionsOrder.map((actualQuestionIndex, index) => {
+                  const isAnswered = answeredQuestions.some(q => q.index === actualQuestionIndex);
+                  const answer = answeredQuestions.find(q => q.index === actualQuestionIndex);
+                  const isCurrentQuestion = index === currentQuestionIndex;
+                  const needPayment = !isTrialQuestion(actualQuestionIndex) && !hasAccessToFullQuiz;
+                  
+                  let buttonClasses = 'w-full h-10 flex items-center justify-center rounded-md font-medium ';
+                  
+                  if (isCurrentQuestion) {
+                    buttonClasses += 'ring-2 ring-offset-2 ring-blue-500 ';
+                  }
+                  
+                  if (needPayment) {
+                    buttonClasses += 'bg-gray-100 text-gray-400 cursor-not-allowed ';
+                  } else if (isAnswered) {
+                    buttonClasses += answer && answer.isCorrect 
+                      ? 'bg-green-100 text-green-800 hover:bg-green-200 ' 
+                      : 'bg-red-100 text-red-800 hover:bg-red-200 ';
+                  } else {
+                    buttonClasses += 'bg-gray-100 text-gray-800 hover:bg-gray-200 ';
+                  }
+                  
+                  return (
+                    <button
+                      key={index}
+                      className={buttonClasses}
+                      onClick={() => jumpToQuestion(index)}
+                      disabled={needPayment}
+                    >
+                      {index + 1}
+                      {needPayment && (
+                        <svg className="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+        
+        {/* 用户未登录提示 */}
+        {!user && (
+          <div className="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <svg className="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div className="ml-3 flex-1">
+              <div className="ml-3">
                 <p className="text-sm text-yellow-700">
-                  您还未登录，答题进度不会被保存。
-                  <button 
+                  您尚未登录，答题进度无法保存。
+                  <button
                     onClick={() => setIsLoginModalOpen(true)}
-                    className="ml-2 font-medium underline"
+                    className="font-medium text-yellow-700 underline ml-1"
                   >
-                    立即登录
+                    点击登录
                   </button>
                 </p>
               </div>
             </div>
           </div>
         )}
-        
-        {/* 模式切换和已答题目按钮 */}
-        <div className="flex justify-between mb-4">
-          <button
-            onClick={toggleMode}
-            className={`${
-              quizSet.isPaid && !hasAccessToFullQuiz
-                ? "bg-gray-400 cursor-not-allowed"  
-                : "bg-blue-600 hover:bg-blue-700"
-            } text-white py-2 px-4 rounded-md text-sm`}
-            disabled={quizSet.isPaid && !hasAccessToFullQuiz && !isRandomMode}
-          >
-            {isRandomMode ? "切换到顺序模式" : "切换到随机模式"}
-            {quizSet.isPaid && !hasAccessToFullQuiz && !isRandomMode && (
-              <span className="ml-1 text-xs">（需购买）</span>
-            )}
-          </button>
-
-          <div className="flex space-x-2">
-            {user && answeredQuestions.length > 0 && (
-              <button
-                onClick={saveProgress}
-                className="bg-green-600 text-white py-2 px-4 rounded-md text-sm hover:bg-green-700"
-              >
-                保存进度
-              </button>
-            )}
-            
-            <button
-              onClick={toggleShowAnswered}
-              className={`py-2 px-4 rounded-md text-sm ${
-                answeredQuestions.length > 0 
-                  ? "bg-blue-600 text-white hover:bg-blue-700" 
-                  : "bg-gray-300 text-gray-500 cursor-not-allowed"
-              }`}
-              disabled={answeredQuestions.length === 0}
-            >
-              {showAnsweredQuestions ? "返回答题" : `查看已答题 (${answeredQuestions.length})`}
-            </button>
-          </div>
-        </div>
-        
-        {/* 题目导航 */}
-        <div className="bg-white shadow-md rounded-lg p-4 mb-4">
-          <h3 className="text-sm font-medium text-gray-700 mb-2">题目导航</h3>
-          <div className="flex flex-wrap gap-2">
-            {questionsOrder.map((actualIndex, index) => (
-              <button
-                key={index}
-                onClick={() => jumpToQuestion(index)}
-                disabled={!isTrialQuestion(actualIndex) && !hasAccessToFullQuiz}
-                className={`h-8 w-8 flex items-center justify-center text-sm rounded-md ${
-                  currentQuestionIndex === index
-                    ? 'bg-blue-600 text-white'
-                    : answeredQuestions.some(q => q.index === actualIndex)
-                      ? answeredQuestions.find(q => q.index === actualIndex)?.isCorrect
-                        ? 'bg-green-500 text-white'
-                        : 'bg-red-500 text-white'
-                      : 'bg-gray-200 text-gray-700'
-                } ${!isTrialQuestion(actualIndex) && !hasAccessToFullQuiz ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-500 hover:text-white'}`}
-              >
-                {!isTrialQuestion(actualIndex) && !hasAccessToFullQuiz ? (
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                ) : (
-                  index + 1
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        {/* 显示当前答题状态或已答题记录 */}
-        {showAnsweredQuestions ? (
-          <div className="bg-white shadow-md rounded-lg p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-800">
-                已答题目 ({filteredAnsweredQuestions.length}/{totalQuestions})
-              </h2>
-
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">统计: </span>
-                <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
-                  正确: {answeredQuestions.filter(q => q.isCorrect).length}
-                </span>
-                <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
-                  错误: {wrongAnswersCount}
-                </span>
-              </div>
-            </div>
-            
-            {/* 错题筛选器 */}
-            {answeredQuestions.length > 0 && wrongAnswersCount > 0 && (
-              <div className="flex items-center justify-end mb-4">
-                <label className="inline-flex items-center cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    checked={onlyShowWrongAnswers}
-                    onChange={toggleShowOnlyWrong}
-                    className="sr-only peer"
-                  />
-                  <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
-                  <span className="ml-3 text-sm font-medium text-gray-700">仅显示错题</span>
-                </label>
-              </div>
-            )}
-            
-            {filteredAnsweredQuestions.length === 0 ? (
-              <p className="text-gray-600">
-                {onlyShowWrongAnswers 
-                  ? "没有错题记录，太棒了！" 
-                  : "还没有回答过任何题目"}
-              </p>
-            ) : (
-              <div className="space-y-4">
-                {filteredAnsweredQuestions.map((answeredQ, index) => {
-                  const question = quizSet.questions[answeredQ.index];
-                  return (
-                    <div 
-                      key={index} 
-                      className={`p-4 border rounded-md ${
-                        answeredQ.isCorrect ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-                      }`}
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-medium text-gray-800">
-                          {index + 1}. {question.question}
-                        </h3>
-                        <div className="flex items-center space-x-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            answeredQ.isCorrect ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'
-                          }`}>
-                            {answeredQ.isCorrect ? '正确' : '错误'}
-                          </span>
-                          <span className="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
-                            {question.questionType === 'single' ? '单选题' : '多选题'}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {/* 显示回答详情 */}
-                      {question.questionType === 'single' ? (
-                        <p className="text-sm text-gray-600 mb-2">
-                          你的答案: {answeredQ.selectedOption as string} - {
-                            question.options.find(opt => opt.id === answeredQ.selectedOption)?.text
-                          }
-                        </p>
-                      ) : (
-                        <div className="mb-2">
-                          <p className="text-sm text-gray-600">你的选择:</p>
-                          <ul className="list-disc list-inside pl-2">
-                            {(answeredQ.selectedOption as string[]).map((optId, idx) => (
-                              <li key={idx} className="text-sm text-gray-600">
-                                {optId} - {question.options.find(opt => opt.id === optId)?.text}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                      
-                      {!answeredQ.isCorrect && (
-                        question.questionType === 'single' ? (
-                          <p className="text-sm text-gray-600">
-                            正确答案: {question.correctAnswer as string} - {
-                              question.options.find(opt => opt.id === question.correctAnswer)?.text
-                            }
-                          </p>
-                        ) : (
-                          <div>
-                            <p className="text-sm text-gray-600">正确答案:</p>
-                            <ul className="list-disc list-inside pl-2">
-                              {(question.correctAnswer as string[]).map((optId, idx) => (
-                                <li key={idx} className="text-sm text-gray-600">
-                                  {optId} - {question.options.find(opt => opt.id === optId)?.text}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )
-                      )}
-                      
-                      <button 
-                        onClick={() => jumpToQuestion(
-                          questionsOrder.findIndex(q => q === answeredQ.index)
-                        )}
-                        className="mt-2 text-sm text-blue-600 hover:text-blue-800"
-                      >
-                        重新查看此题
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            
-            <button 
-              onClick={() => setShowAnsweredQuestions(false)}
-              className="mt-4 bg-blue-600 text-white py-2 px-4 rounded-md text-sm"
-            >
-              返回答题
-            </button>
-          </div>
-        ) : (
-          // 检查当前题目是否需要付费
-          !isTrialQuestion(currentActualQuestionIndex) && !hasAccessToFullQuiz ? (
-            <div className="bg-white shadow-md rounded-lg p-6 text-center">
-              <svg className="h-16 w-16 mx-auto text-yellow-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-              </svg>
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">付费内容</h2>
-              <p className="text-gray-600 mb-4">
-                此题库的免费试用题目已用完，需要购买完整版（¥{quizSet.price}）才能继续。购买后有效期为6个月。
-              </p>
-
-              <div className="flex flex-col space-y-3 sm:flex-row sm:space-y-0 sm:space-x-3 justify-center">
-                <button
-                  onClick={() => setShowPaymentModal(true)}
-                  className="inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  购买完整题库
-                </button>
-
-                {user && (
-                  <button
-                    onClick={() => setShowRedeemForm(!showRedeemForm)}
-                    className="inline-flex justify-center items-center px-4 py-2 border border-blue-300 text-sm font-medium rounded-md shadow-sm text-blue-700 bg-white hover:bg-blue-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    <svg className="mr-2 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-                    </svg>
-                    使用兑换码
-                  </button>
-                )}
-              </div>
-
-              {showRedeemForm && (
-                <div className="mt-4">
-                  <RedeemCodeForm onRedeemSuccess={handleRedeemSuccess} />
-                </div>
-              )}
-            </div>
-          ) : (
-            <QuestionCard
-              question={quizSet.questions[currentActualQuestionIndex]}
-              onNext={handleNextQuestion}
-              onAnswerSubmitted={(isCorrect: boolean, selectedOption: string | string[]) => 
-                handleAnswerSubmitted(currentActualQuestionIndex, isCorrect, selectedOption)
-              }
-              questionNumber={currentQuestionIndex + 1}
-              totalQuestions={totalQuestions}
-              quizTitle={quizSet.title}
-            />
-          )
-        )}
       </div>
       
-      {/* 登录弹窗 */}
-      <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
-
-      {/* 支付弹窗 */}
-      {showPaymentModal && (
-        <PaymentModal 
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          questionSet={quizSet}
-          onSuccess={handlePurchaseSuccess}
-        />
-      )}
+      {/* 登录模态框 */}
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
+      
+      {/* 支付模态框 */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => setShowPaymentModal(false)}
+        questionSet={quizSet}
+        onSuccess={handlePurchaseSuccess}
+      />
     </div>
   );
 };

@@ -21,7 +21,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
-  const { login, register } = useUser();
+  const { login, register, error: contextError } = useUser();
   
   const toggleMode = () => {
     setMode(mode === AuthMode.LOGIN ? AuthMode.REGISTER : AuthMode.LOGIN);
@@ -97,7 +97,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           setError('用户名/邮箱或密码错误');
         }
       } else {
-        success = await register(username, email, password);
+        // 创建用户数据对象
+        const userData = {
+          username,
+          email,
+          password
+        };
+        
+        success = await register(userData);
         if (!success) {
           setError('该用户名或邮箱已被注册');
         }
@@ -105,6 +112,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       
       if (success) {
         onClose(); // 登录/注册成功后关闭弹窗
+      } else if (contextError) {
+        // 如果上下文中有错误信息，则显示
+        setError(contextError);
       }
     } catch (error) {
       setError('登录/注册时发生错误');

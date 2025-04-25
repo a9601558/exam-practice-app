@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { useUser } from '../contexts/UserContext';
 import { questionSets } from '../data/questionSets';
 
+// 扩展返回类型以匹配实际使用
+interface RedeemCodeResult {
+  success: boolean;
+  message: string;
+  quizId?: string;
+  quizTitle?: string;
+}
+
 interface RedeemCodeFormProps {
   onRedeemSuccess?: (quizId: string) => void;
 }
@@ -12,7 +20,7 @@ const RedeemCodeForm: React.FC<RedeemCodeFormProps> = ({ onRedeemSuccess }) => {
   const [message, setMessage] = useState('');
   const [redeemedSet, setRedeemedSet] = useState<any>(null);
   
-  const { user, redeemCode: redeemCodeFunction } = useUser();
+  const { redeemCode: redeemCodeFunction } = useUser();
   
   const handleRedeemCode = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,31 +36,48 @@ const RedeemCodeForm: React.FC<RedeemCodeFormProps> = ({ onRedeemSuccess }) => {
     setMessage('正在验证兑换码...');
     
     try {
-      // 调用 UserContext 中的 redeemCode 函数
-      const result = await redeemCodeFunction(redeemCode.trim());
+      // 调用 UserContext 中的 redeemCode 函数，并将结果类型扩展为 RedeemCodeResult
+      const result = await redeemCodeFunction(redeemCode.trim()) as RedeemCodeResult;
       
       if (result.success) {
         setStatus('success');
         setMessage(result.message || '兑换成功！');
         
         // 查找已兑换的题库信息
-        const set = questionSets.find(s => s.id === result.quizId);
-        if (set) {
-          setRedeemedSet(set);
+        if (result.quizId) {
+          const set = questionSets.find(s => s.id === result.quizId);
           
-          // 调用成功回调函数
-          if (onRedeemSuccess && result.quizId) {
-            onRedeemSuccess(result.quizId);
+          if (set) {
+            setRedeemedSet({
+              ...set,
+              title: result.quizTitle || set.title
+            });
+            
+            // 调用成功回调函数
+            if (onRedeemSuccess) {
+              onRedeemSuccess(result.quizId);
+            }
+          } else {
+            // 如果本地找不到题库信息，使用 API 返回的信息
+            setRedeemedSet({
+              id: result.quizId,
+              title: result.quizTitle || '已兑换的题库',
+              icon: '📚'
+            });
+            
+            if (onRedeemSuccess) {
+              onRedeemSuccess(result.quizId);
+            }
           }
         }
       } else {
         setStatus('error');
         setMessage(result.message || '兑换失败，请检查兑换码是否正确');
       }
-    } catch (error) {
-      setStatus('error');
-      setMessage('兑换过程中发生错误，请稍后再试');
+    } catch (error: any) {
       console.error('Redeem code error:', error);
+      setStatus('error');
+      setMessage(error.message || '兑换过程中发生错误，请稍后再试');
     }
   };
   

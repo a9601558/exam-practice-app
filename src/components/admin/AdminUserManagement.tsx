@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useUser } from '../../contexts/UserContext';
-import { User } from '../../contexts/UserContext';
+import { User } from '../../types';
 
 const AdminUserManagement: React.FC = () => {
   const { getAllUsers, deleteUser, updateUser, adminRegister } = useUser();
@@ -20,10 +20,20 @@ const AdminUserManagement: React.FC = () => {
 
   // 加载用户列表
   useEffect(() => {
-    setIsLoading(true);
-    const usersList = getAllUsers();
-    setUsers(usersList);
-    setIsLoading(false);
+    const fetchUsers = async () => {
+      setIsLoading(true);
+      try {
+        const usersList = await getAllUsers();
+        setUsers(usersList);
+      } catch (error) {
+        console.error("加载用户失败:", error);
+        setStatusMessage({ type: 'error', message: '加载用户列表失败' });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    fetchUsers();
   }, [getAllUsers]);
 
   // 搜索过滤用户
@@ -33,13 +43,17 @@ const AdminUserManagement: React.FC = () => {
   );
 
   // 删除用户处理
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (window.confirm('确定要删除此用户吗？此操作不可逆。')) {
-      const success = deleteUser(userId);
-      if (success) {
-        setUsers(users.filter(user => user.id !== userId));
-        setStatusMessage({ type: 'success', message: '用户删除成功' });
-      } else {
+      try {
+        const result = await deleteUser(userId);
+        if (result.success) {
+          setUsers(users.filter(user => user.id !== userId));
+          setStatusMessage({ type: 'success', message: '用户删除成功' });
+        } else {
+          setStatusMessage({ type: 'error', message: result.message || '删除用户失败' });
+        }
+      } catch (error) {
         setStatusMessage({ type: 'error', message: '删除用户失败' });
       }
       
@@ -49,15 +63,16 @@ const AdminUserManagement: React.FC = () => {
   };
 
   // 编辑用户处理
-  const handleUpdateUser = (userId: string, updates: Partial<User>) => {
-    const success = updateUser(userId, updates);
-    if (success) {
+  const handleUpdateUser = async (userId: string, updates: Partial<User>) => {
+    try {
+      await updateUser(updates); // 更新只需要传入包含id的userData
+      
       // 更新本地用户列表
       setUsers(users.map(user => 
         user.id === userId ? { ...user, ...updates } : user
       ));
       setStatusMessage({ type: 'success', message: '用户信息更新成功' });
-    } else {
+    } catch (error) {
       setStatusMessage({ type: 'error', message: '更新用户信息失败' });
     }
     
@@ -116,22 +131,19 @@ const AdminUserManagement: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const success = await adminRegister(newUser.username, newUser.email, newUser.password);
+      // 创建用户数据对象
+      const userData = {
+        username: newUser.username,
+        email: newUser.email,
+        password: newUser.password,
+        isAdmin: newUser.isAdmin
+      };
       
-      if (success) {
-        // 如果设置为管理员，需要额外更新
-        if (newUser.isAdmin) {
-          // 获取最新用户列表以找到新创建的用户
-          const updatedUsersList = getAllUsers();
-          const createdUser = updatedUsersList.find(user => user.email === newUser.email);
-          
-          if (createdUser) {
-            updateUser(createdUser.id, { isAdmin: true });
-          }
-        }
-        
+      const result = await adminRegister(userData);
+      
+      if (result.success) {
         // 重新加载用户列表
-        const updatedUsersList = getAllUsers();
+        const updatedUsersList = await getAllUsers();
         setUsers(updatedUsersList);
         
         setStatusMessage({ type: 'success', message: '用户创建成功' });
@@ -145,7 +157,7 @@ const AdminUserManagement: React.FC = () => {
           isAdmin: false
         });
       } else {
-        setStatusMessage({ type: 'error', message: '创建失败，邮箱可能已被注册' });
+        setStatusMessage({ type: 'error', message: result.message || '创建失败，邮箱可能已被注册' });
       }
     } catch (error) {
       setStatusMessage({ type: 'error', message: '创建用户时发生错误' });
@@ -334,7 +346,7 @@ const AdminUserManagement: React.FC = () => {
                 <th scope="col" className="py-3.5 pl-4 pr-3 text-left text-sm font-semibold text-gray-900">用户名</th>
                 <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">电子邮箱</th>
                 <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">角色</th>
-                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">收藏题库</th>
+                <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">购买记录</th>
                 <th scope="col" className="px-3 py-3.5 text-left text-sm font-semibold text-gray-900">答题记录</th>
                 <th scope="col" className="relative py-3.5 pl-3 pr-4">
                   <span className="sr-only">操作</span>
@@ -365,10 +377,10 @@ const AdminUserManagement: React.FC = () => {
                       )}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {user.favoriteQuizSets.length}
+                      {user.purchases?.length || 0}
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                      {user.progress.length}
+                      {Object.keys(user.progress || {}).length}
                     </td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
                       <button

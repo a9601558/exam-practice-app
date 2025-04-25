@@ -1,397 +1,402 @@
 import React, { createContext, useState, useContext, useEffect, ReactNode } from 'react';
-import { MOCK_USERS } from '../data/mockUsers';
-import { User, Purchase, RedeemCode } from '../types';
+import { User, Purchase, RedeemCode, UserProgress } from '../types';
+import { userApi, redeemCodeApi } from '../utils/api';
 
-// 用户进度记录类型
+// 定义进度数据的结构
 export interface QuizProgress {
-  quizId: string;
-  quizTitle: string;
-  completedDate: string; // ISO 日期字符串
-  correctCount: number;
-  totalCount: number;
-  wrongAnswers?: { 
-    questionId: number; 
-    userAnswer: string | string[]; 
+  questionSetId: string;
+  answeredQuestions: {
+    questionId: string;
+    selectedOptionId: string;
+    isCorrect: boolean;
   }[];
+  score?: number;
+  lastAttemptDate?: Date;
 }
 
-// 兑换码类型数组
-const MOCK_REDEEM_CODES: RedeemCode[] = [
-  {
-    code: 'EXAM-2023-ABC1',
-    questionSetId: '1',
-    validityDays: 30,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    code: 'EXAM-2023-ABC2',
-    questionSetId: '2',
-    validityDays: 60,
-    createdAt: new Date().toISOString(),
-    usedBy: 'user1',
-    usedAt: new Date().toISOString(),
-  },
-];
-
-// 上下文类型定义
+// 定义上下文的类型
 interface UserContextType {
   user: User | null;
-  users: User[];
-  setUser: (user: User | null) => void;
-  login: (usernameOrEmail: string, password: string) => boolean;
+  loading: boolean;
+  error: string | null;
+  login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
-  register: (username: string, email: string, password: string) => boolean;
-  updateUser: (userIdOrUpdates: string | Partial<User>, updates?: Partial<User>) => boolean;
-  addProgress: (quizId: string, isCorrect: boolean) => void;
-  addPurchase: (purchase: Purchase) => void;
-  hasPurchased: (quizId: string) => boolean;
-  getPurchaseExpiry: (quizId: string) => string | null;
+  register: (userData: Partial<User>) => Promise<boolean>;
+  updateUser: (userData: Partial<User>) => Promise<void>;
+  addProgress: (progress: QuizProgress) => Promise<void>;
+  addPurchase: (purchase: Purchase) => Promise<void>;
+  hasPurchased: (questionSetId: string) => boolean;
+  getPurchaseExpiry: (questionSetId: string) => Date | null;
+  isQuizCompleted: (questionSetId: string) => boolean;
+  getQuizScore: (questionSetId: string) => number | null;
+  getUserProgress: (questionSetId: string) => QuizProgress | undefined;
+  getAnsweredQuestions: (questionSetId: string) => string[];
   isAdmin: () => boolean;
-  redeemCode: (code: string) => Promise<{ 
-    success: boolean; 
-    message: string; 
-    quizId?: string;
-    quizTitle?: string;
-    expiryDate?: string;
-    durationDays?: number;
-  }>;
-  getRedeemCodes: () => RedeemCode[];
-  generateRedeemCode: (questionSetId: string, validityDays: number, quantity?: number) => RedeemCode[] | RedeemCode;
-  isLoading: boolean;
-  // 管理员功能
-  getAllUsers: () => User[];
-  deleteUser: (userId: string) => boolean;
-  adminRegister: (username: string, email: string, password: string) => Promise<boolean>;
+  redeemCode: (code: string) => Promise<{ success: boolean; message: string }>;
+  generateRedeemCode: (questionSetId: string, validityDays: number, quantity: number) => Promise<{ success: boolean; codes?: RedeemCode[]; message: string }>;
+  getRedeemCodes: () => Promise<RedeemCode[]>;
+  getAllUsers: () => Promise<User[]>;
+  deleteUser: (userId: string) => Promise<{ success: boolean; message: string }>;
+  adminRegister: (userData: Partial<User>) => Promise<{ success: boolean; message: string }>;
 }
 
 // 创建上下文
 const UserContext = createContext<UserContextType | undefined>(undefined);
 
-// 上下文提供者组件
+// Provider组件
 export const UserProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [users, setUsers] = useState<User[]>(MOCK_USERS);
-  const [redeemCodes, setRedeemCodes] = useState<RedeemCode[]>(MOCK_REDEEM_CODES);
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Load user from localStorage
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // 初始化时尝试从本地存储加载用户
   useEffect(() => {
-    setIsLoading(true);
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error('Failed to parse saved user', e);
-      }
+    const token = localStorage.getItem('token');
+    if (token) {
+      fetchCurrentUser();
+    } else {
+      setLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
-  // Save user to localStorage when it changes
-  useEffect(() => {
-    if (user) {
-      localStorage.setItem('currentUser', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('currentUser');
+  // 获取当前用户
+  const fetchCurrentUser = async () => {
+    setLoading(true);
+    try {
+      const response = await userApi.getCurrentUser();
+      if (response.success && response.data) {
+        setUser(response.data || null);
+      } else {
+        localStorage.removeItem('token');
+        setError(response.message || 'Failed to fetch user data');
+      }
+    } catch (error) {
+      localStorage.removeItem('token');
+      setError('An error occurred while fetching user data');
+    } finally {
+      setLoading(false);
     }
-  }, [user]);
-
-  const login = (usernameOrEmail: string, password: string): boolean => {
-    // 支持用户名或邮箱登录
-    const foundUser = users.find(
-      (u) => (u.username === usernameOrEmail || u.email === usernameOrEmail) && u.password === password
-    );
-    
-    if (foundUser) {
-      setUser(foundUser);
-      return true;
-    }
-    return false;
   };
 
+  // 登录
+  const login = async (username: string, password: string): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await userApi.login(username, password);
+      if (response.success && response.data) {
+        localStorage.setItem('token', response.data.token);
+        setUser(response.data.user);
+        return true;
+      } else {
+        setError(response.message || 'Invalid username or password');
+        return false;
+      }
+    } catch (error) {
+      setError('An error occurred during login');
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 退出登录
   const logout = () => {
+    localStorage.removeItem('token');
     setUser(null);
   };
 
-  const register = (username: string, email: string, password: string): boolean => {
-    // Check if username already exists
-    if (users.some((u) => u.username === username || u.email === email)) {
-      return false;
-    }
-
-    const newUser: User = {
-      id: `user${users.length + 1}`,
-      username,
-      password,
-      email,
-      isAdmin: false,
-      progress: {},
-      purchases: [],
-      redeemCodes: []
-    };
-
-    setUsers([...users, newUser]);
-    setUser(newUser);
-    return true;
-  };
-
-  const updateUser = (userIdOrUpdates: string | Partial<User>, updates?: Partial<User>): boolean => {
-    // 如果第一个参数是对象，那么是更新当前用户
-    if (typeof userIdOrUpdates === 'object') {
-      if (!user) return false;
-
-      const updatedUser = { ...user, ...userIdOrUpdates };
-      setUser(updatedUser);
-
-      // 同时更新用户数组
-      setUsers(users.map((u) => (u.id === user.id ? updatedUser : u)));
-      return true;
-    } 
-    // 如果第一个参数是字符串，那么是指定用户ID，以管理员身份更新任意用户
-    else if (typeof userIdOrUpdates === 'string' && updates) {
-      const userId = userIdOrUpdates;
-      const userToUpdate = users.find(u => u.id === userId);
-      
-      if (!userToUpdate) return false;
-      
-      const updatedUser = { ...userToUpdate, ...updates };
-      
-      // 更新用户数组
-      setUsers(users.map((u) => (u.id === userId ? updatedUser : u)));
-      
-      // 如果当前登录用户就是被修改的用户，也需要更新当前用户状态
-      if (user && user.id === userId) {
-        setUser(updatedUser);
+  // 注册
+  const register = async (userData: Partial<User>): Promise<boolean> => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await userApi.register(userData);
+      if (response.success && response.data) {
+        localStorage.setItem('token', response.data.token);
+        setUser(response.data.user);
+        return true;
+      } else {
+        setError(response.message || 'Registration failed');
+        return false;
       }
-      
-      return true;
-    }
-    
-    return false;
-  };
-
-  const addProgress = (quizId: string, isCorrect: boolean) => {
-    if (!user) return;
-
-    const updatedProgress = { ...user.progress };
-    if (!updatedProgress[quizId]) {
-      updatedProgress[quizId] = {
-        completedQuestions: 1,
-        totalQuestions: 0, // Will be set properly from QuizPage
-        correctAnswers: isCorrect ? 1 : 0,
-        lastAccessed: new Date().toISOString(),
-      };
-    } else {
-      updatedProgress[quizId] = {
-        ...updatedProgress[quizId],
-        completedQuestions: updatedProgress[quizId].completedQuestions + 1,
-        correctAnswers: updatedProgress[quizId].correctAnswers + (isCorrect ? 1 : 0),
-        lastAccessed: new Date().toISOString(),
-      };
-    }
-
-    updateUser({ progress: updatedProgress });
-  };
-
-  const addPurchase = (purchase: Purchase) => {
-    if (!user) return;
-
-    const updatedPurchases = user.purchases ? [...user.purchases, purchase] : [purchase];
-    updateUser({ purchases: updatedPurchases });
-  };
-
-  const hasPurchased = (quizId: string): boolean => {
-    if (!user || !user.purchases || user.purchases.length === 0) {
+    } catch (error) {
+      setError('An error occurred during registration');
       return false;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    return user.purchases.some(p => 
-      p.quizId === quizId && 
-      new Date(p.expiryDate) > new Date()
+  // 更新用户
+  const updateUser = async (userData: Partial<User>) => {
+    if (!user) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await userApi.updateUser(user.id, userData);
+      if (response.success && response.data) {
+        setUser(response.data);
+      } else {
+        setError(response.message || 'Failed to update user');
+      }
+    } catch (error) {
+      setError('An error occurred while updating user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 添加进度
+  const addProgress = async (progress: QuizProgress) => {
+    if (!user) return;
+    
+    try {
+      // 将QuizProgress转换为UserProgress格式，以匹配API期望的类型
+      const userProgress: UserProgress = {
+        completedQuestions: progress.answeredQuestions.length,
+        totalQuestions: progress.answeredQuestions.length, // 这里应该从问题集获取，暂时设为已回答数量
+        correctAnswers: progress.answeredQuestions.filter(a => a.isCorrect).length,
+        lastAccessed: progress.lastAttemptDate ? progress.lastAttemptDate.toISOString() : new Date().toISOString()
+      };
+      
+      // 创建progress对象的副本
+      const updatedProgress = { ...(user.progress || {}) };
+      // 更新特定题集的进度
+      updatedProgress[progress.questionSetId] = userProgress;
+      
+      // 更新用户
+      await updateUser({ progress: updatedProgress });
+    } catch (error) {
+      console.error('Failed to add progress:', error);
+    }
+  };
+
+  // 添加购买记录
+  const addPurchase = async (purchase: Purchase) => {
+    if (!user) return;
+    
+    try {
+      // 获取当前购买列表
+      const updatedPurchases = [...(user.purchases || [])];
+      updatedPurchases.push(purchase);
+      
+      // 更新用户
+      await updateUser({ purchases: updatedPurchases });
+    } catch (error) {
+      console.error('Failed to add purchase:', error);
+    }
+  };
+
+  // 检查是否已购买
+  const hasPurchased = (questionSetId: string): boolean => {
+    if (!user || !user.purchases) return false;
+    return user.purchases.some(
+      purchase => purchase.quizId === questionSetId && 
+      (new Date(purchase.expiryDate) > new Date() || !purchase.expiryDate)
     );
   };
 
-  const getPurchaseExpiry = (quizId: string): string | null => {
-    if (!user || !user.purchases || user.purchases.length === 0) {
-      return null;
-    }
-
-    const purchase = user.purchases.find(p => p.quizId === quizId);
-    return purchase ? purchase.expiryDate : null;
+  // 获取购买的过期时间
+  const getPurchaseExpiry = (questionSetId: string): Date | null => {
+    if (!user || !user.purchases) return null;
+    const purchase = user.purchases.find(
+      p => p.quizId === questionSetId && new Date(p.expiryDate) > new Date()
+    );
+    return purchase ? new Date(purchase.expiryDate) : null;
   };
 
+  // 检查问题集是否已完成
+  const isQuizCompleted = (questionSetId: string): boolean => {
+    if (!user || !user.progress) return false;
+    const progress = user.progress[questionSetId];
+    return !!progress && progress.completedQuestions > 0 && progress.completedQuestions === progress.totalQuestions;
+  };
+
+  // 获取问题集得分
+  const getQuizScore = (questionSetId: string): number | null => {
+    if (!user || !user.progress) return null;
+    const progress = user.progress[questionSetId];
+    if (!progress) return null;
+    
+    // 计算百分比得分
+    return progress.correctAnswers > 0 
+      ? Math.round((progress.correctAnswers / progress.totalQuestions) * 100) 
+      : 0;
+  };
+
+  // 获取用户在特定问题集上的进度
+  const getUserProgress = (questionSetId: string): QuizProgress | undefined => {
+    if (!user || !user.progress) return undefined;
+    const progress = user.progress[questionSetId];
+    if (!progress) return undefined;
+    
+    // 由于UserProgress和QuizProgress结构不同，这里需要转换
+    // 实际应用中，可能需要从API获取完整的答题记录
+    return {
+      questionSetId,
+      answeredQuestions: [], // 此处应从API获取详细的答题记录
+      score: Math.round((progress.correctAnswers / progress.totalQuestions) * 100),
+      lastAttemptDate: progress.lastAccessed ? new Date(progress.lastAccessed) : undefined
+    };
+  };
+
+  // 获取已回答的问题IDs
+  const getAnsweredQuestions = (questionSetId: string): string[] => {
+    if (!user || !user.progress) return [];
+    const progress = user.progress[questionSetId];
+    if (!progress) return [];
+    
+    // 在实际API实现中，这里应该从后端获取详细的已答题目ID列表
+    // 由于UserProgress中没有存储具体的题目ID，这里只能返回空数组
+    return []; // 需要API支持获取详细的答题记录
+  };
+
+  // 检查用户是否为管理员
   const isAdmin = (): boolean => {
-    return user?.isAdmin === true;
+    return !!user?.isAdmin;
   };
 
-  // Generate redeem codes for a quiz
-  const generateRedeemCode = (questionSetId: string, validityDays: number, quantity = 1): RedeemCode[] | RedeemCode => {
-    // Generate array to hold the new codes
-    const newCodes: RedeemCode[] = [];
+  // 兑换代码
+  const redeemCode = async (code: string): Promise<{ success: boolean; message: string }> => {
+    if (!user) return { success: false, message: '请先登录' };
     
-    for (let i = 0; i < quantity; i++) {
-      // Generate a random code (format: EXAM-YYYY-XXXX where XXXX is random alphanumeric)
-      const randChars = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const year = new Date().getFullYear();
-      const code = `EXAM-${year}-${randChars}`;
-      
-      const newCode: RedeemCode = {
-        code,
-        questionSetId,
-        validityDays,
-        createdAt: new Date().toISOString(),
-      };
-      
-      newCodes.push(newCode);
+    try {
+      const response = await redeemCodeApi.redeemCode(code);
+      if (response.success) {
+        // 刷新用户信息以获取更新的购买记录
+        await fetchCurrentUser();
+        return { success: true, message: '兑换码使用成功！' };
+      } else {
+        return { success: false, message: response.message || '兑换码使用失败' };
+      }
+    } catch (error) {
+      return { success: false, message: '兑换过程中发生错误' };
     }
-    
-    // Update the state with new codes
-    setRedeemCodes([...redeemCodes, ...newCodes]);
-    
-    // Return single code or array based on quantity
-    return quantity === 1 ? newCodes[0] : newCodes;
-  };
-  
-  // Redeem a code to get access to a quiz
-  const redeemCode = async (code: string): Promise<{ 
-    success: boolean; 
-    message: string; 
-    quizId?: string;
-    quizTitle?: string;
-    expiryDate?: string;
-    durationDays?: number;
-  }> => {
-    // Find the code
-    const foundCode = redeemCodes.find(rc => rc.code === code);
-    
-    if (!foundCode) {
-      return { success: false, message: '兑换码无效' };
-    }
-    
-    if (foundCode.usedAt) {
-      return { success: false, message: '兑换码已被使用' };
-    }
-    
-    if (!user) {
-      return { success: false, message: '请先登录再兑换' };
-    }
-    
-    // Mock quiz title from quiz ID
-    const quizTitle = `题库 ${foundCode.questionSetId}`;
-    
-    // Mark the code as used
-    const updatedRedeemCodes = redeemCodes.map(rc => 
-      rc.code === code ? { 
-        ...rc, 
-        usedBy: user.id,
-        usedAt: new Date().toISOString()
-      } : rc
-    );
-    setRedeemCodes(updatedRedeemCodes);
-    
-    // Add purchase to user
-    const expiryDate = new Date();
-    expiryDate.setDate(expiryDate.getDate() + foundCode.validityDays);
-    
-    const purchase: Purchase = {
-      quizId: foundCode.questionSetId,
-      expiryDate: expiryDate.toISOString(),
-      purchaseDate: new Date().toISOString(),
-      transactionId: `REDEEM-${code}`,
-      amount: 0 // Redeemed codes have zero amount
-    };
-    
-    addPurchase(purchase);
-    
-    // Return success with quiz details
-    return { 
-      success: true, 
-      message: '兑换成功', 
-      quizId: foundCode.questionSetId,
-      quizTitle,
-      expiryDate: purchase.expiryDate,
-      durationDays: foundCode.validityDays
-    };
-  };
-  
-  const getRedeemCodes = (): RedeemCode[] => {
-    return redeemCodes;
   };
 
-  // 添加管理员功能
-  const getAllUsers = (): User[] => {
-    return users;
+  // 生成兑换码
+  const generateRedeemCode = async (
+    questionSetId: string,
+    validityDays: number,
+    quantity: number
+  ): Promise<{ success: boolean; codes?: RedeemCode[]; message: string }> => {
+    if (!isAdmin()) return { success: false, message: '无权限执行此操作' };
+    
+    try {
+      const response = await redeemCodeApi.generateRedeemCodes(questionSetId, validityDays, quantity);
+      if (response.success && response.data) {
+        return { 
+          success: true, 
+          codes: response.data, 
+          message: `成功生成 ${response.data.length} 个兑换码` 
+        };
+      } else {
+        return { success: false, message: response.message || '生成兑换码失败' };
+      }
+    } catch (error) {
+      return { success: false, message: '生成兑换码过程中发生错误' };
+    }
   };
 
-  const deleteUser = (userId: string): boolean => {
-    // 不允许删除当前登录用户
-    if (user && user.id === userId) {
-      return false;
-    }
+  // 获取所有兑换码
+  const getRedeemCodes = async (): Promise<RedeemCode[]> => {
+    if (!isAdmin()) return [];
     
-    // 从用户数组中删除用户
-    const updatedUsers = users.filter(u => u.id !== userId);
-    if (updatedUsers.length === users.length) {
-      // 没有删除任何用户
-      return false;
+    try {
+      const response = await redeemCodeApi.getAllRedeemCodes();
+      if (response.success && response.data) {
+        return response.data || [];
+      } else {
+        return [];
+      }
+    } catch (error) {
+      return [];
     }
-    
-    setUsers(updatedUsers);
-    return true;
   };
 
-  const adminRegister = async (username: string, email: string, password: string): Promise<boolean> => {
-    // 检查用户名和邮箱是否已存在
-    if (users.some((u) => u.username === username || u.email === email)) {
-      return false;
+  // 获取所有用户（管理员功能）
+  const getAllUsers = async (): Promise<User[]> => {
+    if (!isAdmin()) return [];
+    
+    try {
+      const response = await userApi.getAllUsers();
+      if (response.success && response.data) {
+        return response.data || [];
+      } else {
+        return [];
+      }
+    } catch (error) {
+      return [];
     }
+  };
 
-    const newUser: User = {
-      id: `user${users.length + 1}`,
-      username,
-      password,
-      email,
-      isAdmin: false,
-      progress: {},
-      purchases: [],
-      redeemCodes: []
-    };
+  // 删除用户（管理员功能）
+  const deleteUser = async (userId: string): Promise<{ success: boolean; message: string }> => {
+    if (!isAdmin()) return { success: false, message: '无权限执行此操作' };
+    
+    try {
+      const response = await userApi.deleteUser(userId);
+      if (response.success) {
+        return { success: true, message: '用户删除成功' };
+      } else {
+        return { success: false, message: response.message || '删除用户失败' };
+      }
+    } catch (error) {
+      return { success: false, message: '删除用户过程中发生错误' };
+    }
+  };
 
-    setUsers([...users, newUser]);
-    return true;
+  // 管理员注册用户
+  const adminRegister = async (userData: Partial<User>): Promise<{ success: boolean; message: string }> => {
+    if (!isAdmin()) return { success: false, message: '无权限执行此操作' };
+    
+    try {
+      const response = await userApi.register(userData);
+      if (response.success) {
+        return { success: true, message: '用户创建成功' };
+      } else {
+        return { success: false, message: response.message || '用户创建失败' };
+      }
+    } catch (error) {
+      return { success: false, message: '创建用户过程中发生错误' };
+    }
+  };
+
+  // 提供上下文值
+  const value = {
+    user,
+    loading,
+    error,
+    login,
+    logout,
+    register,
+    updateUser,
+    addProgress,
+    addPurchase,
+    hasPurchased,
+    getPurchaseExpiry,
+    isQuizCompleted,
+    getQuizScore,
+    getUserProgress,
+    getAnsweredQuestions,
+    isAdmin,
+    redeemCode,
+    generateRedeemCode,
+    getRedeemCodes,
+    getAllUsers,
+    deleteUser,
+    adminRegister,
   };
 
   return (
-    <UserContext.Provider
-      value={{
-        user,
-        users,
-        setUser,
-        login,
-        logout,
-        register,
-        updateUser,
-        addProgress,
-        addPurchase,
-        hasPurchased,
-        getPurchaseExpiry,
-        isAdmin,
-        redeemCode,
-        getRedeemCodes,
-        generateRedeemCode,
-        isLoading,
-        getAllUsers,
-        deleteUser,
-        adminRegister
-      }}
-    >
+    <UserContext.Provider value={value}>
       {children}
     </UserContext.Provider>
   );
 };
 
-// 自定义hook，方便在组件中使用上下文
+// 创建一个自定义hook以便使用上下文
 export const useUser = () => {
   const context = useContext(UserContext);
   if (context === undefined) {
