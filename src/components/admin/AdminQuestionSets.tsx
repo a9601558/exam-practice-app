@@ -6,7 +6,7 @@ import { RedeemCode, QuestionSet as ApiQuestionSet } from '../../types';
 import { useUser } from '../../contexts/UserContext';
 import { questionSetApi } from '../../utils/api';
 import axios from 'axios';  // 添加axios导入
-import { useLocation, useNavigate } from 'react-router-dom'; // 添加路由相关hook
+import { useLocation } from 'react-router-dom'; // 移除 useNavigate import
 
 // Function to convert API question sets to client format
 const mapApiToClientQuestionSet = (apiSet: ApiQuestionSet): ClientQuestionSet => {
@@ -122,7 +122,6 @@ const AdminQuestionSets: React.FC = () => {
 
   // 添加路由相关hook
   const location = useLocation();
-  const navigate = useNavigate();
 
   // 加载所有兑换码
   useEffect(() => {
@@ -845,10 +844,11 @@ const AdminQuestionSets: React.FC = () => {
     // 如果URL包含correctAnswer=on，则直接清除它并更新URL
     if (correctAnswerParam === 'on') {
       console.log('检测到correctAnswer参数，清理URL');
-      // 移除查询参数但保持在当前页面
-      navigate('/admin', { replace: true });
+      // 使用window.history API而不是React Router的navigate
+      const newUrl = window.location.pathname; // 只保留路径部分，移除查询参数
+      window.history.replaceState({}, '', newUrl);
     }
-  }, [location, navigate]);
+  }, [location]);
 
   return (
     <div className="px-4 py-5 sm:p-6">
