@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext';
 import AdminUserManagement from './admin/AdminUserManagement';
-import AdminQuestionSets from './admin/AdminQuestionSets';
+import NewAdminQuestionSets from './admin/NewAdminQuestionSets';
 import AdminHomeContent from './admin/AdminHomeContent';
 import AdminRedeemCodes from './admin/AdminRedeemCodes';
 import AdminFeaturedQuestionSets from './admin/AdminFeaturedQuestionSets';
@@ -259,7 +259,7 @@ const AdminPage: React.FC = () => {
                 )}
                 
                 {activeTab === AdminTab.USERS && <AdminUserManagement />}
-                {activeTab === AdminTab.QUESTION_SETS && <AdminQuestionSets />}
+                {activeTab === AdminTab.QUESTION_SETS && <NewAdminQuestionSets />}
                 {activeTab === AdminTab.REDEEM_CODES && <AdminRedeemCodes />}
                 {activeTab === AdminTab.HOME_CONTENT && <AdminHomeContent />}
                 {activeTab === AdminTab.FEATURED_QUESTION_SETS && <AdminFeaturedQuestionSets />}

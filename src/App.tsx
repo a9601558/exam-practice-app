@@ -7,13 +7,13 @@ import ProfilePage from './components/ProfilePage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { UserProvider } from './contexts/UserContext'
 import AdminPanel from './components/AdminPanel'
-// import URLInterceptor from './components/URLInterceptor'
+import URLInterceptor from './components/URLInterceptor'
 
 function App() {
   return (
     <UserProvider>
       <Router>
-        {/* Removed URLInterceptor component */}
+        <URLInterceptor />
         <Layout>
           <Routes>
             <Route path="/" element={<HomePage />} />
