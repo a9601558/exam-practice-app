@@ -6,7 +6,7 @@ import { RedeemCode, QuestionSet as ApiQuestionSet } from '../../types';
 import { useUser } from '../../contexts/UserContext';
 import { questionSetApi } from '../../utils/api';
 import axios from 'axios';  // 添加axios导入
-import { useLocation } from 'react-router-dom'; // 移除 useNavigate import
+import { useLocation, useNavigate } from 'react-router-dom'; // 添加路由相关hook
 
 // Function to convert API question sets to client format
 const mapApiToClientQuestionSet = (apiSet: ApiQuestionSet): ClientQuestionSet => {
@@ -122,6 +122,7 @@ const AdminQuestionSets: React.FC = () => {
 
   // 添加路由相关hook
   const location = useLocation();
+  const navigate = useNavigate();
 
   // 加载所有兑换码
   useEffect(() => {
@@ -215,13 +216,7 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理创建题库提交 - 使用API
-  const handleCreateSubmit = async (e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleCreateSubmit = async () => {
     // 验证表单
     if (!formData.id || !formData.title || !formData.category) {
       showStatusMessage('error', '请填写所有必填字段');
@@ -304,13 +299,7 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理编辑题库提交 - 使用API
-  const handleEditSubmit = async (e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleEditSubmit = async () => {
     if (!currentQuestionSet) return;
     
     // 验证表单
@@ -407,13 +396,7 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 生成兑换码
-  const handleGenerateCode = async (e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleGenerateCode = async () => {
     if (!selectedQuizForCode) return;
     
     try {
@@ -440,25 +423,13 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 打开题目管理模态框
-  const handleManageQuestions = (questionSet: ClientQuestionSet, e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleManageQuestions = (questionSet: ClientQuestionSet) => {
     setCurrentQuestionSet(questionSet);
     setShowQuestionModal(true);
   };
 
   // 处理添加新题目
-  const handleAddQuestion = (e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleAddQuestion = () => {
     setIsAddingQuestion(true);
     setCurrentQuestion(null);
     setQuestionFormData({
@@ -523,13 +494,7 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理添加选项
-  const handleAddOption = (e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleAddOption = () => {
     if (!optionInput.text.trim()) {
       showStatusMessage('error', '选项内容不能为空');
       return;
@@ -616,13 +581,7 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理删除选项
-  const handleDeleteOption = (index: number, e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleDeleteOption = (index: number) => {
     const updatedOptions = [...questionFormData.options];
     const removedOption = updatedOptions[index];
     updatedOptions.splice(index, 1);
@@ -646,13 +605,7 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理保存题目
-  const handleSaveQuestion = async (e?: React.MouseEvent) => {
-    // 阻止可能的默认事件，防止页面刷新
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    
+  const handleSaveQuestion = async () => {
     if (!currentQuestionSet) return;
     
     // 验证表单
@@ -887,15 +840,15 @@ const AdminQuestionSets: React.FC = () => {
   useEffect(() => {
     // 获取URL参数
     const queryParams = new URLSearchParams(location.search);
+    const correctAnswerParam = queryParams.get('correctAnswer');
     
-    // 如果URL包含任何查询参数，直接清除它们并更新URL
-    if (queryParams.toString()) {
-      console.log('检测到URL查询参数，清理URL');
-      // 使用window.history API直接更新URL
-      const newUrl = window.location.pathname; // 只保留路径部分，移除查询参数
-      window.history.replaceState({}, '', newUrl);
+    // 如果URL包含correctAnswer=on，则直接清除它并更新URL
+    if (correctAnswerParam === 'on') {
+      console.log('检测到correctAnswer参数，清理URL');
+      // 移除查询参数但保持在当前页面
+      navigate('/admin', { replace: true });
     }
-  }, [location]);
+  }, [location, navigate]);
 
   return (
     <div className="px-4 py-5 sm:p-6">
@@ -1271,7 +1224,7 @@ const AdminQuestionSets: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={(e) => handleCreateSubmit(e)}
+              onClick={handleCreateSubmit}
               disabled={loading && loadingAction === 'create'}
               className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${loading && loadingAction === 'create' ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             >
@@ -1443,7 +1396,7 @@ const AdminQuestionSets: React.FC = () => {
             <p className="text-sm text-gray-600">题目数量：{currentQuestionSet.questions.length}</p>
             <button
               type="button"
-              onClick={(e) => handleManageQuestions(currentQuestionSet, e)}
+              onClick={() => handleManageQuestions(currentQuestionSet)}
               className="mt-2 text-sm text-blue-600 hover:text-blue-800"
             >
               管理题目 »
@@ -1461,7 +1414,7 @@ const AdminQuestionSets: React.FC = () => {
             </button>
             <button
               type="button"
-              onClick={(e) => handleEditSubmit(e)}
+              onClick={handleEditSubmit}
               disabled={loading && loadingAction === 'edit'}
               className={`inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${loading && loadingAction === 'edit' ? 'bg-blue-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500`}
             >
@@ -1538,7 +1491,7 @@ const AdminQuestionSets: React.FC = () => {
               {!generatedCode ? (
                 <button
                   type="button"
-                  onClick={(e) => handleGenerateCode(e)}
+                  onClick={handleGenerateCode}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   生成兑换码
@@ -1670,23 +1623,7 @@ const AdminQuestionSets: React.FC = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="text-md font-medium text-gray-700">题目列表</h4>
                     <button
-                      type="button"
-                      onClick={(e) => {
-                        // 防止默认行为
-                        e.preventDefault(); 
-                        e.stopPropagation();
-                        // 清除可能存在的 URL 查询参数
-                        if (window.location.search) {
-                          window.history.replaceState({}, '', window.location.pathname);
-                        }
-                        // 安全调用处理函数
-                        try {
-                          handleAddQuestion(e);
-                        } catch (error) {
-                          console.error('处理添加题目失败:', error);
-                        }
-                        return false;
-                      }}
+                      onClick={handleAddQuestion}
                       className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo"
                     >
                       <svg className="-ml-1 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1838,7 +1775,7 @@ const AdminQuestionSets: React.FC = () => {
                                     </label>
                                     <button
                                       type="button"
-                                      onClick={(e) => handleDeleteOption(index, e)}
+                                      onClick={() => handleDeleteOption(index)}
                                       className="text-xs text-red-600 hover:text-red-900"
                                     >
                                       删除
@@ -1871,7 +1808,7 @@ const AdminQuestionSets: React.FC = () => {
                           </div>
                           <button
                             type="button"
-                            onClick={(e) => handleAddOption(e)}
+                            onClick={handleAddOption}
                             className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo"
                           >
                             添加选项
@@ -1909,7 +1846,7 @@ const AdminQuestionSets: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={(e) => handleSaveQuestion(e)}
+                          onClick={handleSaveQuestion}
                           className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                         >
                           保存题目
