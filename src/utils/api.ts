@@ -25,14 +25,24 @@ export async function fetchWithAuth<T>(
   };
 
   try {
+    // Debug the actual request data being sent
+    if (options.body) {
+      console.log(`API Request to ${endpoint}:`, JSON.parse(options.body as string));
+    }
+    
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers,
+      credentials: 'include', // Add credentials to include cookies in the request
     });
 
+    // Log response status
+    console.log(`API Response from ${endpoint}:`, response.status);
+    
     const data = await response.json();
     
     if (!response.ok) {
+      console.error(`API Error from ${endpoint}:`, data);
       return {
         success: false,
         error: data.message || 'Unknown error occurred',
@@ -45,7 +55,7 @@ export async function fetchWithAuth<T>(
       message: data.message,
     };
   } catch (error) {
-    logger.error('API request failed', error);
+    logger.error(`API request failed for ${endpoint}`, error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error occurred',

@@ -35,7 +35,9 @@ const mapApiToClientQuestionSet = (apiSet: ApiQuestionSet): ClientQuestionSet =>
 
 // Function to convert client question sets to API format
 const mapClientToApiQuestionSet = (clientSet: ClientQuestionSet): Partial<ApiQuestionSet> => {
-  return {
+  console.log('原始客户端数据:', clientSet);
+  
+  const result = {
     id: clientSet.id,
     title: clientSet.title,
     description: clientSet.description,
@@ -44,20 +46,37 @@ const mapClientToApiQuestionSet = (clientSet: ClientQuestionSet): Partial<ApiQue
     isPaid: clientSet.isPaid,
     price: clientSet.isPaid ? clientSet.price : undefined,
     trialQuestions: clientSet.isPaid ? clientSet.trialQuestions : undefined,
-    questions: clientSet.questions.map(q => ({
-      id: q.id.toString(),
-      text: q.question,
-      questionType: q.questionType,
-      explanation: q.explanation,
-      options: q.options.map(opt => ({
-        id: opt.id,
-        text: opt.text,
-        isCorrect: Array.isArray(q.correctAnswer) 
-          ? q.correctAnswer.includes(opt.id)
-          : q.correctAnswer === opt.id
-      }))
-    }))
+    questions: clientSet.questions.map(q => {
+      // 确保ID是字符串
+      const questionId = q.id ? q.id.toString() : Date.now().toString();
+      
+      console.log(`处理题目: ${questionId}, 内容: ${q.question}`);
+      
+      return {
+        id: questionId,
+        text: q.question,
+        questionType: q.questionType,
+        explanation: q.explanation,
+        options: q.options.map(opt => {
+          const isCorrect = Array.isArray(q.correctAnswer) 
+            ? q.correctAnswer.includes(opt.id)
+            : q.correctAnswer === opt.id;
+          
+          console.log(`处理选项: ${opt.id}, 文本: ${opt.text}, 正确: ${isCorrect}`);
+          
+          return {
+            id: opt.id,
+            text: opt.text,
+            isCorrect: isCorrect
+          };
+        })
+      };
+    })
   };
+  
+  console.log('转换为API格式:', result);
+  
+  return result;
 };
 
 const AdminQuestionSets: React.FC = () => {
@@ -795,22 +814,40 @@ const AdminQuestionSets: React.FC = () => {
       return;
     }
 
+    console.log('准备上传文件:', {
+      name: uploadFile.name,
+      type: uploadFile.type,
+      size: uploadFile.size
+    });
+
     const formData = new FormData();
     formData.append('file', uploadFile);
-
+    
+    // 添加调试信息
+    console.log('上传文件:', uploadFile.name, uploadFile.type, uploadFile.size);
+    
     setIsUploading(true);
     setUploadProgress(0);
 
     try {
+      // 确保FormData中有内容
+      for (const pair of formData.entries()) {
+        console.log('FormData内容:', pair[0], pair[1]);
+      }
+      
       const response = await axios.post('/api/question-sets/upload/file', formData, {
         headers: {
-          'Content-Type': 'multipart/form-data'
+          'Content-Type': 'multipart/form-data',
+          'Accept': 'application/json'
         },
+        withCredentials: true,
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / (progressEvent.total || 1));
           setUploadProgress(percentCompleted);
         }
       });
+
+      console.log('上传响应:', response);
 
       if (response.data.success) {
         showStatusMessage('success', '题库文件上传成功');
@@ -830,6 +867,7 @@ const AdminQuestionSets: React.FC = () => {
       }
     } catch (error: any) {
       console.error('文件上传错误:', error);
+      console.error('错误详情:', error.response?.data);
       showStatusMessage('error', `上传失败：${error.response?.data?.message || error.message || '服务器错误'}`);
     } finally {
       setIsUploading(false);

@@ -20,7 +20,13 @@ router.get('/', getAllQuestionSets);
 router.post('/upload', protect, admin, uploadQuestionSets);
 
 // File upload route
-router.post('/upload/file', protect, admin, upload.single('file'), uploadQuestionSetFile);
+router.post('/upload/file', protect, admin, (req, res, next) => {
+  console.log('进入文件上传路由');
+  next();
+}, upload.single('file'), (req, res, next) => {
+  console.log('Multer处理完成，文件状态:', req.file ? '成功' : '失败');
+  next();
+}, uploadQuestionSetFile);
 
 // Protected routes that use ID parameters
 router.post('/:id/progress', protect, saveProgress);

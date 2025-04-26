@@ -23,24 +23,34 @@ const storage = multer.diskStorage({
     if (!fs.existsSync(uploadsDir)) {
       fs.mkdirSync(uploadsDir, { recursive: true });
     }
+    console.log('保存文件到目录:', uploadsDir);
     cb(null, uploadsDir);
   },
   filename: function (req: any, file: any, cb: any) {
     const uniqueSuffix = Date.now() + '-' + uuidv4();
-    cb(null, uniqueSuffix + path.extname(file.originalname));
+    const fileName = uniqueSuffix + path.extname(file.originalname);
+    console.log('生成文件名:', fileName);
+    cb(null, fileName);
   }
 });
 
 export const upload = multer({
   storage: storage,
   fileFilter: (req: any, file: any, cb: any) => {
-    if (file.mimetype === 'application/json' || 
-        file.mimetype === 'text/csv' || 
-        file.mimetype === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-        file.mimetype === 'application/vnd.ms-excel') {
+    console.log('收到文件:', file.originalname, file.mimetype);
+    const allowedMimes = [
+      'application/json', 
+      'text/csv', 
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'application/vnd.ms-excel',
+      'text/plain'
+    ];
+    
+    if (allowedMimes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('仅支持上传JSON、CSV或Excel文件'));
+      console.error('不支持的文件类型:', file.mimetype);
+      cb(new Error(`不支持的文件类型: ${file.mimetype}，仅支持JSON、CSV或Excel文件`));
     }
   },
   limits: {
@@ -55,12 +65,23 @@ export const upload = multer({
  */
 export const uploadQuestionSetFile = async (req: MulterRequest, res: Response) => {
   try {
+    console.log('收到文件上传请求:', req.file ? '有文件' : '无文件');
+    
     if (!req.file) {
+      console.error('没有收到文件:', req.headers, req.body);
       return res.status(400).json({
         success: false,
         message: '请上传文件'
       });
     }
+
+    console.log('文件信息:', {
+      filename: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      destination: req.file.destination,
+      path: req.file.path
+    });
 
     const filePath = req.file.path;
     const fileExt = path.extname(req.file.originalname).toLowerCase();
