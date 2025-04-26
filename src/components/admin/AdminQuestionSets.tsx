@@ -440,13 +440,25 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 打开题目管理模态框
-  const handleManageQuestions = (questionSet: ClientQuestionSet) => {
+  const handleManageQuestions = (questionSet: ClientQuestionSet, e?: React.MouseEvent) => {
+    // 阻止可能的默认事件，防止页面刷新
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     setCurrentQuestionSet(questionSet);
     setShowQuestionModal(true);
   };
 
   // 处理添加新题目
-  const handleAddQuestion = () => {
+  const handleAddQuestion = (e?: React.MouseEvent) => {
+    // 阻止可能的默认事件，防止页面刷新
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     setIsAddingQuestion(true);
     setCurrentQuestion(null);
     setQuestionFormData({
@@ -511,7 +523,13 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理添加选项
-  const handleAddOption = () => {
+  const handleAddOption = (e?: React.MouseEvent) => {
+    // 阻止可能的默认事件，防止页面刷新
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     if (!optionInput.text.trim()) {
       showStatusMessage('error', '选项内容不能为空');
       return;
@@ -598,7 +616,13 @@ const AdminQuestionSets: React.FC = () => {
   };
 
   // 处理删除选项
-  const handleDeleteOption = (index: number) => {
+  const handleDeleteOption = (index: number, e?: React.MouseEvent) => {
+    // 阻止可能的默认事件，防止页面刷新
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     const updatedOptions = [...questionFormData.options];
     const removedOption = updatedOptions[index];
     updatedOptions.splice(index, 1);
@@ -1419,7 +1443,7 @@ const AdminQuestionSets: React.FC = () => {
             <p className="text-sm text-gray-600">题目数量：{currentQuestionSet.questions.length}</p>
             <button
               type="button"
-              onClick={() => handleManageQuestions(currentQuestionSet)}
+              onClick={(e) => handleManageQuestions(currentQuestionSet, e)}
               className="mt-2 text-sm text-blue-600 hover:text-blue-800"
             >
               管理题目 »
@@ -1646,7 +1670,7 @@ const AdminQuestionSets: React.FC = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="text-md font-medium text-gray-700">题目列表</h4>
                     <button
-                      onClick={handleAddQuestion}
+                      onClick={(e) => handleAddQuestion(e)}
                       className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo"
                     >
                       <svg className="-ml-1 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -1798,7 +1822,7 @@ const AdminQuestionSets: React.FC = () => {
                                     </label>
                                     <button
                                       type="button"
-                                      onClick={() => handleDeleteOption(index)}
+                                      onClick={(e) => handleDeleteOption(index, e)}
                                       className="text-xs text-red-600 hover:text-red-900"
                                     >
                                       删除
@@ -1831,7 +1855,7 @@ const AdminQuestionSets: React.FC = () => {
                           </div>
                           <button
                             type="button"
-                            onClick={handleAddOption}
+                            onClick={(e) => handleAddOption(e)}
                             className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo"
                           >
                             添加选项
