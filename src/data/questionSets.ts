@@ -10,6 +10,8 @@ export interface QuestionSet {
   isPaid: boolean; // 是否为付费题库
   price?: number; // 价格（元），只有isPaid为true时才有意义
   trialQuestions?: number; // 免费试用的题目数量，默认为0
+  isFeatured?: boolean; // 是否为精选题库
+  featuredCategory?: string; // 精选分类
 }
 
 export const questionSets: QuestionSet[] = [

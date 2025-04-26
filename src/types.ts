@@ -33,6 +33,8 @@ export interface Question {
   text: string;
   options: Option[];
   explanation: string;
+  questionType?: 'single' | 'multiple';
+  correctAnswer?: string | string[];
 }
 
 export interface Option {

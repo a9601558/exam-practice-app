@@ -4,9 +4,9 @@ import Layout from './components/Layout'
 import HomePage from './components/HomePage'
 import QuizPage from './components/QuizPage'
 import ProfilePage from './components/ProfilePage'
-import AdminPage from './components/AdminPage'
 import ProtectedRoute from './components/ProtectedRoute'
 import { UserProvider } from './contexts/UserContext'
+import AdminPanel from './components/AdminPanel'
 
 function App() {
   return (
@@ -22,7 +22,7 @@ function App() {
             } />
             <Route path="/admin" element={
               <ProtectedRoute>
-                <AdminPage />
+                <AdminPanel />
               </ProtectedRoute>
             } />
             <Route path="/quiz/:quizId" element={<QuizPage />} />

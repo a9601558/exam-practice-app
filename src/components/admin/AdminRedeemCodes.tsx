@@ -78,7 +78,19 @@ const AdminRedeemCodes: React.FC = () => {
 
     try {
       setIsLoading(true);
-      await generateRedeemCode(selectedQuestionSet, validityDays, quantity);
+      console.log('Generating codes with params:', {
+        questionSetId: selectedQuestionSet,
+        validityDays,
+        quantity
+      });
+      
+      const result = await generateRedeemCode(selectedQuestionSet, validityDays, quantity);
+      
+      if (!result.success) {
+        throw new Error(result.message || '生成兑换码失败');
+      }
+      
+      console.log('Code generation result:', result);
       
       // 重新获取更新后的兑换码列表
       const updatedCodes = await getRedeemCodes();

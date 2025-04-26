@@ -5,13 +5,15 @@ import AdminUserManagement from './admin/AdminUserManagement';
 import AdminQuestionSets from './admin/AdminQuestionSets';
 import AdminHomeContent from './admin/AdminHomeContent';
 import AdminRedeemCodes from './admin/AdminRedeemCodes';
+import AdminFeaturedQuestionSets from './admin/AdminFeaturedQuestionSets';
 
 enum AdminTab {
   USERS = 'users',
   QUESTION_SETS = 'questionSets',
   HOME_CONTENT = 'homeContent',
   REDEEM_CODES = 'redeemCodes',
-  DASHBOARD = 'dashboard'
+  DASHBOARD = 'dashboard',
+  FEATURED_QUESTION_SETS = 'featuredQuestionSets'
 }
 
 const AdminPage: React.FC = () => {
@@ -105,6 +107,15 @@ const AdminPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                   </svg>
                   首页内容管理
+                </button>
+                <button
+                  onClick={() => setActiveTab(AdminTab.FEATURED_QUESTION_SETS)}
+                  className={`w-full text-left px-3 py-2 rounded-md flex items-center ${activeTab === AdminTab.FEATURED_QUESTION_SETS ? 'bg-gray-200 text-gray-900' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                  <svg className="mr-3 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                  </svg>
+                  精选题库管理
                 </button>
               </nav>
             </div>
@@ -249,8 +260,9 @@ const AdminPage: React.FC = () => {
                 
                 {activeTab === AdminTab.USERS && <AdminUserManagement />}
                 {activeTab === AdminTab.QUESTION_SETS && <AdminQuestionSets />}
-                {activeTab === AdminTab.HOME_CONTENT && <AdminHomeContent />}
                 {activeTab === AdminTab.REDEEM_CODES && <AdminRedeemCodes />}
+                {activeTab === AdminTab.HOME_CONTENT && <AdminHomeContent />}
+                {activeTab === AdminTab.FEATURED_QUESTION_SETS && <AdminFeaturedQuestionSets />}
               </div>
             </div>
           </div>

@@ -1,6 +1,91 @@
 # 考试练习应用
 
-这是一个用于练习考试题目的Web应用，支持多种题型、付费题库和兑换码系统。
+一个帮助用户准备考试的应用程序，允许用户浏览题库、练习题目、购买题集，并跟踪学习进度。
+
+## 项目结构
+
+```
+.
+├── client/             # 前端React应用
+└── server/             # 后端Node.js服务
+```
+
+## 快速开始
+
+### 后端服务
+
+1. 进入server目录
+```bash
+cd server
+```
+
+2. 安装依赖
+```bash
+npm install
+```
+
+3. 配置环境变量
+```bash
+cp .env.example .env
+# 编辑.env文件，填写必要的配置项
+```
+
+4. 启动服务
+```bash
+npm run dev
+```
+
+### 前端应用
+
+1. 进入client目录
+```bash
+cd client
+```
+
+2. 安装依赖
+```bash
+npm install
+```
+
+3. 启动开发服务器
+```bash
+npm start
+```
+
+## 部署
+
+请参阅 [部署指南](server/DEPLOYMENT.md) 了解如何将应用部署到生产环境。
+
+## 数据库管理
+
+初次启动或遇到数据库表缺失问题，请参阅 [数据库维护指南](server/DATABASE.md)。
+
+## 主要功能
+
+- 题库浏览与购买
+- 题目练习与答题
+- 学习进度追踪
+- 会员权限管理
+- 兑换码系统
+
+## 技术栈
+
+- **前端**: React, TypeScript, Tailwind CSS
+- **后端**: Node.js, Express, TypeScript
+- **数据库**: MySQL, Sequelize ORM
+- **认证**: JWT
+
+## 贡献指南
+
+1. Fork 该项目
+2. 创建新的功能分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add some amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 创建Pull Request
+
+## 许可证
+
+MIT
 
 ## 功能特点
 

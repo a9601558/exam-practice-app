@@ -1,4 +1,5 @@
 import { Model, DataTypes, Optional } from 'sequelize';
+import db from '../config/db';
 import { sequelize } from '../config/db';
 
 // 题集接口
@@ -11,6 +12,8 @@ export interface QuestionSetAttributes {
   isPaid: boolean;
   price?: number;
   trialQuestions?: number;
+  isFeatured?: boolean;
+  featuredCategory?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -28,6 +31,8 @@ class QuestionSet extends Model<QuestionSetAttributes, QuestionSetCreationAttrib
   public isPaid!: boolean;
   public price?: number;
   public trialQuestions?: number;
+  public isFeatured?: boolean;
+  public featuredCategory?: string;
   
   // 时间戳
   public readonly createdAt!: Date;
@@ -80,13 +85,23 @@ QuestionSet.init(
       validate: {
         min: 0
       }
+    },
+    isFeatured: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false
+    },
+    featuredCategory: {
+      type: DataTypes.STRING(50),
+      allowNull: true
     }
   },
   {
     sequelize,
     tableName: 'question_sets',
     indexes: [
-      { fields: ['category'] }
+      { fields: ['category'] },
+      { fields: ['isFeatured'] }
     ],
     hooks: {
       beforeValidate: (questionSet: QuestionSet) => {

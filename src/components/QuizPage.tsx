@@ -6,6 +6,7 @@ import LoginModal from './LoginModal';
 import PaymentModal from './PaymentModal';
 import RedeemCodeForm from './RedeemCodeForm';
 import { useUser } from '../contexts/UserContext';
+import { QuizProgress } from '../contexts/UserContext';
 
 const QuizPage = () => {
   const { quizId } = useParams<{ quizId: string }>();
@@ -133,13 +134,16 @@ const QuizPage = () => {
 
   // 保存用户答题进度
   const saveProgress = async () => {
-    if (!user || !quizSet || answeredQuestions.length === 0) return;
+    if (!quizSet || answeredQuestions.length === 0) return;
     
-    // 创建QuizProgress对象
-    const progress = {
+    const progress: QuizProgress = {
       questionSetId: quizSet.id,
       answeredQuestions: answeredQuestions.map(answer => ({
-        questionId: String(quizSet.questions[answer.index].id), // 确保questionId是字符串
+        questionId: typeof answer.index === 'number' 
+          ? String(quizSet.questions[answer.index].id)
+          : Array.isArray(answer.selectedOption) 
+            ? answer.selectedOption.join(',')
+            : answer.selectedOption,
         selectedOptionId: typeof answer.selectedOption === 'string' 
           ? answer.selectedOption 
           : answer.selectedOption.join(','),
@@ -154,9 +158,9 @@ const QuizPage = () => {
     // 调用addProgress保存进度
     try {
       await addProgress(progress);
+      console.log('学习进度保存成功');
     } catch (error) {
-      // 在生产环境中应使用适当的错误记录服务
-      // console.error("保存进度失败:", error);
+      console.error("保存进度失败:", error);
     }
   };
 

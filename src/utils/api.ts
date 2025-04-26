@@ -70,7 +70,7 @@ export const userApi = {
   },
 
   getCurrentUser: async (): Promise<ApiResponse<User>> => {
-    return fetchWithAuth<User>('/users/me');
+    return fetchWithAuth<User>('/users/profile');
   },
 
   updateUser: async (userId: string, userData: Partial<User>): Promise<ApiResponse<User>> => {
@@ -100,6 +100,34 @@ export const questionSetApi = {
   getQuestionSetById: async (questionSetId: string): Promise<ApiResponse<QuestionSet>> => {
     return fetchWithAuth<QuestionSet>(`/question-sets/${questionSetId}`);
   },
+  
+  createQuestionSet: async (questionSetData: Partial<QuestionSet>): Promise<ApiResponse<QuestionSet>> => {
+    return fetchWithAuth<QuestionSet>('/question-sets', {
+      method: 'POST',
+      body: JSON.stringify(questionSetData),
+    });
+  },
+  
+  updateQuestionSet: async (questionSetId: string, questionSetData: Partial<QuestionSet>): Promise<ApiResponse<QuestionSet>> => {
+    return fetchWithAuth<QuestionSet>(`/question-sets/${questionSetId}`, {
+      method: 'PUT',
+      body: JSON.stringify(questionSetData),
+    });
+  },
+  
+  deleteQuestionSet: async (questionSetId: string): Promise<ApiResponse<void>> => {
+    return fetchWithAuth<void>(`/question-sets/${questionSetId}`, {
+      method: 'DELETE',
+    });
+  },
+  
+  uploadQuestionSets: async (questionSets: Partial<QuestionSet>[]): Promise<ApiResponse<any>> => {
+    console.log('Uploading question sets, count:', questionSets.length);
+    return fetchWithAuth<any>('/question-sets/upload', {
+      method: 'POST',
+      body: JSON.stringify({ questionSets }),
+    });
+  }
 };
 
 // Purchase related API calls
@@ -130,9 +158,17 @@ export const redeemCodeApi = {
     validityDays: number,
     quantity: number
   ): Promise<ApiResponse<RedeemCode[]>> => {
+    console.log('Constructing API request for code generation:', { questionSetId, validityDays, quantity });
     return fetchWithAuth<RedeemCode[]>('/redeem-codes/generate', {
       method: 'POST',
-      body: JSON.stringify({ questionSetId, validityDays, quantity }),
+      body: JSON.stringify({ 
+        questionSetId, 
+        validityDays, 
+        quantity 
+      }),
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
   },
 
