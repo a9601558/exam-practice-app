@@ -1670,7 +1670,23 @@ const AdminQuestionSets: React.FC = () => {
                   <div className="flex justify-between items-center mb-4">
                     <h4 className="text-md font-medium text-gray-700">题目列表</h4>
                     <button
-                      onClick={(e) => handleAddQuestion(e)}
+                      type="button"
+                      onClick={(e) => {
+                        // 防止默认行为
+                        e.preventDefault(); 
+                        e.stopPropagation();
+                        // 清除可能存在的 URL 查询参数
+                        if (window.location.search) {
+                          window.history.replaceState({}, '', window.location.pathname);
+                        }
+                        // 安全调用处理函数
+                        try {
+                          handleAddQuestion(e);
+                        } catch (error) {
+                          console.error('处理添加题目失败:', error);
+                        }
+                        return false;
+                      }}
                       className="inline-flex items-center px-3 py-1 border border-transparent text-sm leading-5 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-500 focus:outline-none focus:border-indigo-700 focus:shadow-outline-indigo"
                     >
                       <svg className="-ml-1 mr-1 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
